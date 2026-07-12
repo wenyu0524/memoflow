@@ -20,7 +20,7 @@ watch(
   async (value) => {
     await nextTick();
 
-    if (editor.value && editor.value.innerHTML !== value) {
+    if (editor.value && normalizeRichText(editor.value.innerHTML) !== value) {
       editor.value.innerHTML = value;
     }
   },
