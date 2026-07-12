@@ -1,0 +1,1 @@
+{"default":{"identifier":"default","description":"Default permissions for the main MemoFlow window.","local":true,"windows":["main"],"permissions":["core:default","core:window:allow-close","core:window:allow-set-always-on-top","core:window:allow-set-resizable","core:window:allow-start-dragging","core:event:allow-listen"]}}
