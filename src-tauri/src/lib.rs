@@ -132,6 +132,10 @@ pub fn run() {
             }
 
             if let WindowEvent::Moved(position) = event {
+                // Moving a maximized window resets its native maximize state on Windows.
+                if window.is_maximized().unwrap_or(false) || window.is_fullscreen().unwrap_or(false) {
+                    return;
+                }
                 let Ok(Some(monitor)) = window.current_monitor() else {
                     return;
                 };
@@ -142,6 +146,10 @@ pub fn run() {
                 let threshold = 18;
                 let monitor_position = monitor.position();
                 let monitor_size = monitor.size();
+                // The move event can arrive before the maximize state has been updated.
+                if window_size.width >= monitor_size.width {
+                    return;
+                }
                 let left = monitor_position.x;
                 let right =
                     monitor_position.x + monitor_size.width as i32 - window_size.width as i32;
