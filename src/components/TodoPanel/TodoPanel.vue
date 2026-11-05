@@ -64,6 +64,7 @@ async function startEditing(id: string, html: string) {
 async function finishItem(id: string) {
   const html = itemEditors.get(id)?.innerHTML ?? '';
   editingId.value = null;
+  window.getSelection()?.removeAllRanges();
   await todoStore.updateTitle(id, html);
   await todoStore.cleanupBlank(id);
 }
@@ -89,6 +90,15 @@ function cancelEditing(id: string) {
   }
 
   editingId.value = null;
+  window.getSelection()?.removeAllRanges();
+}
+
+function removeItem(id: string) {
+  if (editingId.value === id) {
+    editingId.value = null;
+    window.getSelection()?.removeAllRanges();
+  }
+  void todoStore.remove(id);
 }
 
 function updateDraftState() {
@@ -139,7 +149,7 @@ onUnmounted(() => document.removeEventListener('pointerdown', finishOnOutsideCli
           <button type="button" aria-label="编辑" title="编辑" @click.stop="startEditing(item.id, item.title)">
             <Pencil :size="13" />
           </button>
-          <button type="button" aria-label="删除" title="删除" @click.stop="todoStore.remove(item.id)">
+          <button type="button" aria-label="删除" title="删除" @click.stop="removeItem(item.id)">
             <Trash2 :size="13" />
           </button>
         </div>
