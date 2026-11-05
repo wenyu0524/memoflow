@@ -58,7 +58,7 @@ function updateMemo(event: Event) {
 <style scoped>
 .memo-panel {
   display: grid;
-  grid-template-rows: auto 1fr;
+  grid-template-rows: auto minmax(0, 1fr);
   min-width: 0;
   min-height: 0;
   padding: 18px 30px 28px 28px;

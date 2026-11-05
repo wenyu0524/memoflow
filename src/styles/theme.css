@@ -8,7 +8,7 @@
   --color-text: #1f2937;
   --color-muted: rgba(31, 41, 55, 0.68);
   --color-completed: rgba(156, 163, 175, 0.7);
-  --color-glass: #ffffff;
+  --color-glass: rgba(255, 255, 255, 0.94);
   --color-glass-border: rgba(255, 255, 255, 0.8);
   --color-line: rgba(21, 27, 44, 0.18);
   --color-divider: rgba(21, 27, 44, 0.08);
@@ -23,7 +23,7 @@
   --color-text: #f3f4f6;
   --color-muted: rgba(243, 244, 246, 0.68);
   --color-completed: rgba(156, 163, 175, 0.7);
-  --color-glass: #232323;
+  --color-glass: rgba(35, 35, 35, 0.94);
   --color-glass-border: rgba(255, 255, 255, 0.14);
   --color-line: rgba(247, 249, 255, 0.2);
   --color-divider: rgba(247, 249, 255, 0.1);

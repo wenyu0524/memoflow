@@ -4,7 +4,7 @@ use serde_json::Value;
 use tauri::{
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
-    AppHandle, Emitter, Manager, PhysicalPosition, WindowEvent,
+    AppHandle, Emitter, Manager, WindowEvent,
 };
 use tauri_plugin_window_state::{Builder as WindowStateBuilder, StateFlags};
 
@@ -128,44 +128,6 @@ pub fn run() {
             if let WindowEvent::CloseRequested { api, .. } = event {
                 api.prevent_close();
                 let _ = window.hide();
-                return;
-            }
-
-            if let WindowEvent::Moved(position) = event {
-                // Moving a maximized window resets its native maximize state on Windows.
-                if window.is_maximized().unwrap_or(false) || window.is_fullscreen().unwrap_or(false) {
-                    return;
-                }
-                let Ok(Some(monitor)) = window.current_monitor() else {
-                    return;
-                };
-                let Ok(window_size) = window.outer_size() else {
-                    return;
-                };
-
-                let threshold = 18;
-                let monitor_position = monitor.position();
-                let monitor_size = monitor.size();
-                // The move event can arrive before the maximize state has been updated.
-                if window_size.width >= monitor_size.width {
-                    return;
-                }
-                let left = monitor_position.x;
-                let right =
-                    monitor_position.x + monitor_size.width as i32 - window_size.width as i32;
-                let target_x = if (position.x - left).abs() <= threshold {
-                    Some(left)
-                } else if (position.x - right).abs() <= threshold {
-                    Some(right)
-                } else {
-                    None
-                };
-
-                if let Some(x) = target_x {
-                    if position.x != x {
-                        let _ = window.set_position(PhysicalPosition::new(x, position.y));
-                    }
-                }
             }
         })
         .run(tauri::generate_context!())

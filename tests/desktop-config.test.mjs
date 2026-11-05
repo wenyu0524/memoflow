@@ -7,9 +7,9 @@ const json = (path) => JSON.parse(read(path));
 const config = json('src-tauri/tauri.conf.json');
 const window = config.app.windows[0];
 
-test('native window has no transparent corner cutouts', () => {
-  assert.equal(window.transparent, false);
-  assert.equal(window.shadow, false);
+test('native window supports the translucent surface and native shadow', () => {
+  assert.equal(window.transparent, true);
+  assert.equal(window.shadow, true);
 });
 
 test('window can resize beyond the old 1000 × 800 limit', () => {

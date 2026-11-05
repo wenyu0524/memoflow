@@ -14,5 +14,6 @@
   min-height: 0;
   overflow: hidden;
   background: var(--color-glass);
+  box-shadow: inset 0 0 0 1px var(--color-divider);
 }
 </style>

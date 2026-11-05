@@ -113,13 +113,15 @@ onUnmounted(() => {
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-  background: var(--color-glass);
+  border-radius: 8px;
+  background: transparent;
 }
 
 .two-column-layout {
   position: relative;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
   flex: 1;
   width: 100%;
   min-height: 0;

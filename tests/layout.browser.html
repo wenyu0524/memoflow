@@ -40,6 +40,21 @@ await check('超高内容在列表内部滚动', () => {
   assert(list.scrollHeight > list.clientHeight, '没有产生滚动');
   assert(list.clientHeight < 300, '列表撑开了窗口');
 });
+for (const height of [120, 180, 300]) {
+  fixture.style.width = '330px';
+  fixture.style.height = `${height}px`;
+  await check(`${height}px 高度下所有待办不压缩、不堆叠`, () => {
+    const rows = [...fixture.querySelectorAll('.todo-row')];
+    for (let i = 0; i < rows.length; i++) {
+      const rect = rows[i].getBoundingClientRect();
+      const text = rows[i].querySelector('.rich-line').getBoundingClientRect();
+      assert(text.top >= rect.top && text.bottom <= rect.bottom + .1, '缩小高度后文字溢出');
+      if (rows[i+1]) assert(rect.bottom <= rows[i+1].getBoundingClientRect().top, '缩小高度后行重叠');
+    }
+    const list = fixture.querySelector('.todo-list');
+    assert(list.scrollHeight > list.clientHeight, '没有产生内部滚动');
+  });
+}
 await check('混合大字号仍然按实际内容高度布局', () => {
   fixture.querySelector('.rich-line').innerHTML = '<span style="font-size:32px">大字号</span><br>普通字号';
   const row = fixture.querySelector('.todo-row');

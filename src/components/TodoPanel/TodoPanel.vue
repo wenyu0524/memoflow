@@ -181,7 +181,7 @@ onUnmounted(() => document.removeEventListener('pointerdown', finishOnOutsideCli
 <style scoped>
 .todo-panel {
   display: grid;
-  grid-template-rows: auto 1fr;
+  grid-template-rows: auto minmax(0, 1fr);
   min-width: 0;
   min-height: 0;
   padding: 18px 28px 28px 30px;
@@ -209,9 +209,9 @@ h1 {
 }
 
 .todo-list {
-  display: grid;
-  grid-auto-rows: max-content;
-  align-content: start;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
   gap: 4px;
   min-height: 0;
   overflow: auto;
@@ -219,6 +219,7 @@ h1 {
 }
 
 .todo-row {
+  flex-shrink: 0;
   display: grid;
   grid-template-columns: 20px minmax(0, 1fr);
   position: relative;
