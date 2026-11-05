@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="zh-CN">
+<meta charset="utf-8">
+<title>MemoFlow 长文本布局回归</title>
+<h1>真实 TodoPanel 组件布局回归</h1><pre id="results">运行中</pre>
+<div id="fixture" style="width:330px;height:300px;display:flex"><div id="mount" style="display:flex;width:100%;height:100%"></div></div>
+<script type="module">
+import { createApp, nextTick } from 'vue';
+import { createPinia } from 'pinia';
+import TodoPanel from '/src/components/TodoPanel/TodoPanel.vue';
+import { useTodoStore } from '/src/store/todo/todoStore.ts';
+import '/src/styles/reset.css';
+import '/src/styles/theme.css';
+import '/src/styles/base.css';
+const pinia = createPinia();
+const store = useTodoStore(pinia);
+store.items = ['第一条', '多行长待办'.repeat(500), '最后一条'].map((title, index) => ({id:String(index), title, completed:false, createdAt:'', updatedAt:''}));
+createApp(TodoPanel).use(pinia).mount('#mount');
+const fixture = document.querySelector('#fixture');
+const results = [];
+const assert = (condition, message) => {if (!condition) throw Error(message);};
+async function check(name, run) {
+  try {await nextTick(); run(); results.push(`PASS ${name}`);}
+  catch (error) {results.push(`FAIL ${name}: ${error.message}`);}
+}
+for (const width of [220, 330, 900]) {
+  fixture.style.width = `${width}px`;
+  await check(`${width}px 列宽下长文字不覆盖相邻行`, () => {
+    const rows = [...fixture.querySelectorAll('.todo-row')];
+    for (let i = 0; i < rows.length; i++) {
+      const rect = rows[i].getBoundingClientRect();
+      const text = rows[i].querySelector('.rich-line').getBoundingClientRect();
+      assert(text.top >= rect.top && text.bottom <= rect.bottom + .1, '文字超出行边界');
+      if (rows[i+1]) assert(rect.bottom <= rows[i+1].getBoundingClientRect().top, '相邻行重叠');
+    }
+  });
+}
+await check('超高内容在列表内部滚动', () => {
+  const list = fixture.querySelector('.todo-list');
+  assert(list.scrollHeight > list.clientHeight, '没有产生滚动');
+  assert(list.clientHeight < 300, '列表撑开了窗口');
+});
+await check('混合大字号仍然按实际内容高度布局', () => {
+  fixture.querySelector('.rich-line').innerHTML = '<span style="font-size:32px">大字号</span><br>普通字号';
+  const row = fixture.querySelector('.todo-row');
+  assert(row.getBoundingClientRect().height >= row.querySelector('.rich-line').getBoundingClientRect().height + 15, '上下留白不足');
+});
+document.querySelector('#results').textContent = results.join('\n');
+document.title = `${results.filter(line => line.startsWith('PASS')).length}/${results.length} PASS — MemoFlow layout`;
+</script>
+</html>

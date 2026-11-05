@@ -210,6 +210,7 @@ h1 {
 
 .todo-list {
   display: grid;
+  grid-auto-rows: max-content;
   align-content: start;
   gap: 4px;
   min-height: 0;
