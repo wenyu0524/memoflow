@@ -2,6 +2,7 @@ import { defineStore } from 'pinia';
 import type { MemoDocument } from '@/types/memo';
 import { useFeedbackStore } from '@/store/feedback/feedbackStore';
 import { readJsonFile, writeJsonFile } from '@/utils/storage/jsonStorage';
+import { normalizeRichText } from '@/utils/richText/richText';
 
 interface MemoState {
   document: MemoDocument;
@@ -23,6 +24,7 @@ export const useMemoStore = defineStore('memo', {
       }
 
       this.document = await readJsonFile('memo');
+      this.document.content = normalizeRichText(this.document.content);
       this.loaded = true;
     },
     async updateContent(content: string) {

@@ -28,7 +28,10 @@ export const useTodoStore = defineStore('todo', {
         return;
       }
 
-      this.items = await readJsonFile('todo');
+      this.items = (await readJsonFile('todo')).map((item) => ({
+        ...item,
+        title: normalizeRichText(item.title),
+      }));
       this.loaded = true;
     },
     async save() {

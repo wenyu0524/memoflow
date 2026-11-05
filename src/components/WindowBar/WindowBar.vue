@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { getCurrentWindow } from '@tauri-apps/api/window';
-import { Lock, Pin, PinOff, Unlock, X } from '@lucide/vue';
+import { Lock, Maximize2, Pin, PinOff, Unlock, X } from '@lucide/vue';
 import { useThemeStore } from '@/store/theme/themeStore';
 import { isTauriRuntime } from '@/utils/environment/isTauri';
 
@@ -36,6 +36,12 @@ async function closeWindow() {
     await getCurrentWindow().close();
   }
 }
+
+async function toggleMaximize() {
+  if (!locked.value && isTauriRuntime()) {
+    await getCurrentWindow().toggleMaximize();
+  }
+}
 </script>
 
 <template>
@@ -44,6 +50,9 @@ async function closeWindow() {
 
     <div class="window-actions" aria-label="窗口操作">
       <slot />
+      <button v-if="!locked" type="button" title="最大化/还原" aria-label="最大化/还原" @click="toggleMaximize">
+        <Maximize2 :size="15" />
+      </button>
       <button
         type="button"
         :class="{ active: pinned }"

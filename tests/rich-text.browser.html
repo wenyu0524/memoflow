@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="zh-CN">
+<meta charset="utf-8">
+<title>MemoFlow 富文本回归测试</title>
+<style>#fixture {font: 500 16px/1.45 sans-serif; width:240px} pre {white-space:pre-wrap}</style>
+<h1>富文本回归测试</h1><pre id="results">运行中</pre><div id="fixture"></div>
+<script type="module">
+import { normalizeRichText, flattenFontSizes } from '/src/utils/richText/richText.ts';
+const results = [];
+const fixture = document.querySelector('#fixture');
+const assert = (condition, message) => { if (!condition) throw Error(message); };
+function test(name, run) {
+  try { run(); results.push(`PASS ${name}`); }
+  catch (error) { results.push(`FAIL ${name}: ${error.message}`); }
+}
+test('字号恢复后，单行高度与原始一致', () => {
+  fixture.innerHTML = '<span style="font-size:16px">今日待办测试</span>';
+  const height = fixture.getBoundingClientRect().height;
+  fixture.innerHTML = normalizeRichText('<span style="font-size:32px"><span style="font-size:16px">今日待办测试</span></span>');
+  assert(Math.abs(fixture.getBoundingClientRect().height - height) < 0.1, '行高未恢复');
+  assert(!fixture.innerHTML.includes('32px'), '外层大字号仍存在');
+});
+test('多次放大缩小后不累积标签或行高', () => {
+  for (let i = 0; i < 20; i++) {
+    fixture.innerHTML = normalizeRichText(`<span style="font-size:32px"><span style="font-size:16px">${fixture.innerHTML}</span></span>`);
+  }
+  assert(fixture.querySelectorAll('span').length === 1, '标签重复累积');
+  assert(fixture.getBoundingClientRect().height < 25, '行高变大');
+});
+test('局部字号修改保留未选中文字的原字号', () => {
+  fixture.innerHTML = normalizeRichText('<span style="font-size:32px">大<span style="font-size:16px">小</span>大</span>');
+  const sizes = [...fixture.querySelectorAll('span')].map(span => span.style.fontSize);
+  assert(sizes.join(',') === '32px,16px,32px', sizes.join(','));
+  assert(fixture.textContent === '大小大', '文字改变');
+});
+test('保留粗体、颜色和换行', () => {
+  fixture.innerHTML = normalizeRichText('<b><span style="color:red;font-size:32px"><span style="font-size:16px">文字</span></span></b><br>下一行');
+  assert(fixture.querySelector('b'), '粗体丢失');
+  assert(fixture.querySelector('[style*="color"]'), '颜色丢失');
+  assert(fixture.querySelector('br'), '换行丢失');
+});
+test('规范化具有幂等性', () => {
+  const html = fixture.innerHTML;
+  assert(normalizeRichText(html) === normalizeRichText(normalizeRichText(html)), '重复处理改变结果');
+});
+test('保留选择范围标记', () => {
+  fixture.innerHTML = '<span style="font-size:32px"><!--start--><span style="font-size:16px">选择</span><!--end--></span>';
+  flattenFontSizes(fixture);
+  assert(fixture.innerHTML.includes('<!--start-->') && fixture.innerHTML.includes('<!--end-->'), '标记丢失');
+});
+test('清理空的大字号标签', () => {
+  fixture.innerHTML = normalizeRichText('<span style="font-size:32px"></span>正常文字');
+  assert(!fixture.querySelector('span'), '空标签残留');
+});
+test('移除脚本、事件和不允许的样式', () => {
+  const html = normalizeRichText('<script>alert(1)<\/script><span onclick="alert(1)" style="letter-spacing:10px;font-size:16px">内容</span>');
+  assert(!/script|onclick|letter-spacing/.test(html), '危险或无效内容残留');
+});
+document.querySelector('#results').textContent = results.join('\n');
+document.title = `${results.filter(line => line.startsWith('PASS')).length}/${results.length} PASS — MemoFlow`;
+</script>
+</html>

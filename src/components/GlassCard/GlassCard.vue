@@ -13,7 +13,6 @@
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-  border-radius: 20px;
   background: var(--color-glass);
 }
 </style>

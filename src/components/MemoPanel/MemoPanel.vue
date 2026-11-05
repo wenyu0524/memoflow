@@ -36,7 +36,7 @@ function updateMemo(event: Event) {
 
 <template>
   <section class="memo-panel" aria-labelledby="memo-title">
-    <header class="panel-head" data-tauri-drag-region>
+    <header class="panel-head" :data-tauri-drag-region="settingsStore.settings?.editingLocked ? null : ''">
       <h1 id="memo-title">备忘录</h1>
     </header>
 

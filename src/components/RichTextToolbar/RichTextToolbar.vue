@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Bold, ChevronDown } from '@lucide/vue';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { flattenFontSizes } from '@/utils/richText/richText';
 
 type InlineStyleName = 'color' | 'fontSize' | 'fontWeight';
 type ToggleState = 'on' | 'off' | 'mixed';
@@ -309,11 +310,19 @@ function applySelectionStyles(style: Partial<Record<InlineStyleName, string>>, c
 
   span.appendChild(fragment);
   range.insertNode(span);
+  const start = document.createComment('selection-start');
+  const end = document.createComment('selection-end');
+  span.before(start);
+  span.after(end);
+  flattenFontSizes(editor);
   selection.removeAllRanges();
 
   const nextRange = document.createRange();
 
-  nextRange.selectNodeContents(span);
+  nextRange.setStartAfter(start);
+  nextRange.setEndBefore(end);
+  start.remove();
+  end.remove();
   selection.addRange(nextRange);
   activeEditor.value = editor;
   savedRange.value = nextRange.cloneRange();

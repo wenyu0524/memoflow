@@ -32,11 +32,11 @@ async function addDraft() {
     return;
   }
 
-  await todoStore.add(value);
   if (editor) {
     editor.innerHTML = '';
   }
   draftEmpty.value = true;
+  await todoStore.add(value);
   await nextTick();
   draftEditor.value?.focus();
 }
@@ -106,7 +106,7 @@ onUnmounted(() => document.removeEventListener('pointerdown', finishOnOutsideCli
 
 <template>
   <section class="todo-panel" aria-labelledby="today-title">
-    <header class="panel-head" data-tauri-drag-region>
+    <header class="panel-head" :data-tauri-drag-region="settingsStore.settings?.editingLocked ? null : ''">
       <h1 id="today-title">今日待办</h1>
       <span>{{ todoStore.remainingCount }} left</span>
     </header>
@@ -201,10 +201,10 @@ h1 {
 .todo-list {
   display: grid;
   align-content: start;
-  gap: 13px;
+  gap: 4px;
   min-height: 0;
   overflow: auto;
-  padding-right: 2px;
+  padding: 3px;
 }
 
 .todo-row {
@@ -213,13 +213,15 @@ h1 {
   position: relative;
   align-items: center;
   gap: 11px;
-  min-height: 24px;
+  min-height: 40px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  transition: background 150ms ease, box-shadow 150ms ease;
 }
 
 .todo-row.editing {
-  border-radius: 6px;
-  background: color-mix(in srgb, var(--color-primary) 12%, transparent);
-  box-shadow: inset 3px 0 var(--color-primary);
+  background: color-mix(in srgb, var(--color-text) 4%, var(--color-glass));
+  box-shadow: inset 0 0 0 1px var(--color-divider);
 }
 
 .todo-icon-cell {
@@ -246,7 +248,7 @@ h1 {
   word-break: break-word;
 }
 
-.todo-row.done .rich-line {
+.todo-row.done:not(.editing) .rich-line {
   color: var(--color-completed);
   text-decoration: line-through;
   opacity: 0.7;
@@ -276,7 +278,7 @@ h1 {
 
 .row-actions {
   position: absolute;
-  right: 0;
+  right: 8px;
   display: flex;
   gap: 4px;
   opacity: 0;
