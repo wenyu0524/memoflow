@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { nextTick, onMounted, ref } from 'vue';
+import { nextTick, onMounted, onUnmounted, ref } from 'vue';
 import type { ComponentPublicInstance } from 'vue';
 import { Pencil, Trash2 } from '@lucide/vue';
 import CircleCheckbox from '@/components/Checkbox/CircleCheckbox.vue';
@@ -49,25 +49,36 @@ async function startEditing(id: string, html: string) {
   editingId.value = id;
   editingSnapshot.value = html;
   await nextTick();
-  itemEditors.get(id)?.focus();
+  const editor = itemEditors.get(id);
+  if (editor) {
+    editor.focus();
+    const range = document.createRange();
+    range.selectNodeContents(editor);
+    range.collapse(false);
+    const selection = window.getSelection();
+    selection?.removeAllRanges();
+    selection?.addRange(range);
+  }
 }
 
-async function finishItem(id: string, index: number) {
+async function finishItem(id: string) {
   const html = itemEditors.get(id)?.innerHTML ?? '';
-
+  editingId.value = null;
   await todoStore.updateTitle(id, html);
   await todoStore.cleanupBlank(id);
-  editingId.value = null;
-  await nextTick();
+}
 
-  const nextItem = todoStore.items[index + 1];
-
-  if (nextItem) {
-    itemEditors.get(nextItem.id)?.focus();
-    return;
+function toggleItem(id: string) {
+  if (!settingsStore.settings?.editingLocked && editingId.value !== id) {
+    void todoStore.toggle(id);
   }
+}
 
-  draftEditor.value?.focus();
+function finishOnOutsideClick(event: PointerEvent) {
+  if (!editingId.value || !(event.target instanceof Element)) return;
+  const row = itemEditors.get(editingId.value)?.closest('.todo-row');
+  if (row?.contains(event.target) || event.target.closest('.rich-toolbar')) return;
+  void finishItem(editingId.value);
 }
 
 function cancelEditing(id: string) {
@@ -85,9 +96,12 @@ function updateDraftState() {
 }
 
 onMounted(async () => {
+  document.addEventListener('pointerdown', finishOnOutsideClick, true);
   await nextTick();
   draftEditor.value?.focus();
 });
+
+onUnmounted(() => document.removeEventListener('pointerdown', finishOnOutsideClick, true));
 </script>
 
 <template>
@@ -98,12 +112,13 @@ onMounted(async () => {
     </header>
 
     <div class="todo-list" aria-label="今日待办">
-      <label v-for="(item, index) in todoStore.items" :key="item.id" class="todo-row" :class="{ done: item.completed }">
+      <div v-for="item in todoStore.items" :key="item.id" class="todo-row" :class="{ done: item.completed, editing: editingId === item.id }" @click="toggleItem(item.id)">
         <span class="todo-icon-cell">
           <CircleCheckbox
             :checked="item.completed"
             :disabled="settingsStore.settings?.editingLocked ?? false"
-            @toggle="todoStore.toggle(item.id)"
+            @click.stop
+            @toggle="toggleItem(item.id)"
           />
         </span>
         <div
@@ -115,21 +130,20 @@ onMounted(async () => {
           spellcheck="false"
           aria-label="待办内容"
           v-html="item.title"
-          @blur="editingId === item.id ? finishItem(item.id, index) : undefined"
           @paste="insertPlainText"
-          @keydown.enter.prevent="finishItem(item.id, index)"
+          @keydown.enter.prevent="finishItem(item.id)"
           @keydown.esc.prevent="cancelEditing(item.id)"
         />
 
         <div v-if="!settingsStore.settings?.editingLocked" class="row-actions" aria-label="待办操作">
-          <button type="button" aria-label="编辑" title="编辑" @click="startEditing(item.id, item.title)">
+          <button type="button" aria-label="编辑" title="编辑" @click.stop="startEditing(item.id, item.title)">
             <Pencil :size="13" />
           </button>
-          <button type="button" aria-label="删除" title="删除" @click="todoStore.remove(item.id)">
+          <button type="button" aria-label="删除" title="删除" @click.stop="todoStore.remove(item.id)">
             <Trash2 :size="13" />
           </button>
         </div>
-      </label>
+      </div>
 
       <label class="todo-row todo-draft">
         <span class="todo-icon-cell">
@@ -200,6 +214,12 @@ h1 {
   align-items: center;
   gap: 11px;
   min-height: 24px;
+}
+
+.todo-row.editing {
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--color-primary) 12%, transparent);
+  box-shadow: inset 3px 0 var(--color-primary);
 }
 
 .todo-icon-cell {

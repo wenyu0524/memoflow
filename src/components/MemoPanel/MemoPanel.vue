@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from 'vue';
+import { nextTick, ref, watch } from 'vue';
 import { useMemoStore } from '@/store/memo/memoStore';
 import { useThemeStore } from '@/store/theme/themeStore';
 import { debounce } from '@/utils/function/debounce';
@@ -8,8 +8,6 @@ import { insertPlainText, normalizeRichText } from '@/utils/richText/richText';
 const memoStore = useMemoStore();
 const settingsStore = useThemeStore();
 const editor = ref<HTMLElement | null>(null);
-
-const statusText = computed(() => (memoStore.document.updatedAt ? '已保存' : '自动保存'));
 
 const saveMemo = debounce((value: string) => {
   void memoStore.updateContent(value);
@@ -40,7 +38,6 @@ function updateMemo(event: Event) {
   <section class="memo-panel" aria-labelledby="memo-title">
     <header class="panel-head" data-tauri-drag-region>
       <h1 id="memo-title">备忘录</h1>
-      <span>{{ statusText }}</span>
     </header>
 
     <div
@@ -81,11 +78,6 @@ h1 {
   font-size: 18px;
   font-weight: 600;
   letter-spacing: 0;
-}
-
-.panel-head span {
-  color: var(--color-muted);
-  font-size: 12px;
 }
 
 .memo-editor {

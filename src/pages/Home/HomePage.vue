@@ -1,6 +1,5 @@
 <script setup lang="ts">
-import { motion } from 'motion-v';
-import { onMounted, onUnmounted } from 'vue';
+import { onMounted, onUnmounted, ref } from 'vue';
 import GlassCard from '@/components/GlassCard/GlassCard.vue';
 import MemoPanel from '@/components/MemoPanel/MemoPanel.vue';
 import RichTextToolbar from '@/components/RichTextToolbar/RichTextToolbar.vue';
@@ -16,6 +15,38 @@ import { bindTrayWindowEvents, initializeWindowBehavior } from '@/utils/window/w
 const memoStore = useMemoStore();
 const themeStore = useThemeStore();
 const todoStore = useTodoStore();
+const memoOpen = ref(false);
+const todoWidth = ref(65);
+const layout = ref<HTMLElement | null>(null);
+const resizing = ref(false);
+
+function resizePanels(event: PointerEvent) {
+  if (!resizing.value || !layout.value) return;
+  const rect = layout.value.getBoundingClientRect();
+  const available = rect.width - 10;
+  const width = Math.max(180, Math.min(available - 160, event.clientX - rect.left - 5));
+  todoWidth.value = width / available * 100;
+}
+
+function startResize(event: PointerEvent) {
+  if (themeStore.settings?.editingLocked || event.button !== 0) return;
+  resizing.value = true;
+  (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+  event.preventDefault();
+}
+
+function stopResize() {
+  resizing.value = false;
+}
+
+function resizeWithKeyboard(event: KeyboardEvent) {
+  if (themeStore.settings?.editingLocked || !layout.value) return;
+  if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+  event.preventDefault();
+  const available = layout.value.clientWidth - 10;
+  todoWidth.value = Math.max(180 / available * 100, Math.min((available - 160) / available * 100,
+    todoWidth.value + (event.key === 'ArrowLeft' ? -2 : 2)));
+}
 
 let stopThemeWatcher: (() => void) | undefined;
 let stopTrayEvents: (() => void) | undefined;
@@ -52,23 +83,25 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <motion.main
+  <main
     class="app-shell"
     aria-label="MemoFlow"
-    :initial="{ opacity: 0, scale: 0.985 }"
-    :animate="{ opacity: 1, scale: 1 }"
-    :transition="{ duration: 0.18, ease: 'easeOut' }"
   >
     <RichTextToolbar />
     <SaveToast />
     <GlassCard>
-      <WindowBar />
-      <div class="two-column-layout">
+      <WindowBar>
+        <button class="memo-toggle" type="button" :aria-expanded="memoOpen" aria-controls="memo-pane" @click="memoOpen = !memoOpen">
+          {{ memoOpen ? '收起备忘录' : '备忘录' }}
+        </button>
+      </WindowBar>
+      <div ref="layout" class="two-column-layout" :class="{ 'memo-open': memoOpen, resizing }" :style="{ '--todo-width': `${todoWidth}fr`, '--memo-width': `${100 - todoWidth}fr` }">
         <TodoPanel />
-        <MemoPanel />
+        <div v-if="memoOpen" class="panel-divider" role="separator" aria-label="调整待办与备忘录宽度" aria-orientation="vertical" :aria-valuenow="Math.round(todoWidth)" :aria-valuemin="0" :aria-valuemax="100" :tabindex="themeStore.settings?.editingLocked ? -1 : 0" @pointerdown="startResize" @pointermove="resizePanels" @pointerup="stopResize" @pointercancel="stopResize" @lostpointercapture="stopResize" @keydown="resizeWithKeyboard" />
+        <MemoPanel v-show="memoOpen" id="memo-pane" />
       </div>
     </GlassCard>
-  </motion.main>
+  </main>
 </template>
 
 <style scoped>
@@ -80,34 +113,53 @@ onUnmounted(() => {
   min-width: 0;
   min-height: 0;
   overflow: hidden;
+  border-radius: 20px;
 }
 
 .two-column-layout {
   position: relative;
   display: grid;
-  grid-template-columns: minmax(0, 0.94fr) minmax(0, 1.06fr);
+  grid-template-columns: minmax(0, 1fr);
   flex: 1;
   width: 100%;
   min-height: 0;
 }
 
-.two-column-layout::before {
+.two-column-layout.memo-open {
+  grid-template-columns: minmax(180px, var(--todo-width)) 10px minmax(160px, var(--memo-width));
+}
+
+.panel-divider {
+  position: relative;
+  margin: 22px 0 26px;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.panel-divider::before {
   position: absolute;
-  top: 22px;
-  bottom: 26px;
-  left: 47%;
-  width: 1px;
+  inset: 0 4px;
   background: var(--color-divider);
   content: '';
 }
 
-.two-column-layout > :first-child {
-  grid-column: 1;
-  grid-row: 1;
+.panel-divider:hover::before,
+.panel-divider:focus-visible::before,
+.resizing .panel-divider::before {
+  background: var(--color-primary);
 }
 
-.two-column-layout > :last-child {
-  grid-column: 2;
-  grid-row: 1;
+.resizing {
+  user-select: none;
+}
+
+.memo-toggle {
+  padding: 4px 10px;
+  border: 0;
+  border-radius: 6px;
+  color: var(--color-muted);
+  background: var(--color-control);
+  font-size: 12px;
+  cursor: pointer;
 }
 </style>

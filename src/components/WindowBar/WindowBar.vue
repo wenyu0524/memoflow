@@ -43,6 +43,7 @@ async function closeWindow() {
     <div class="drag-zone" :data-tauri-drag-region="locked ? null : ''" />
 
     <div class="window-actions" aria-label="窗口操作">
+      <slot />
       <button
         type="button"
         :class="{ active: pinned }"

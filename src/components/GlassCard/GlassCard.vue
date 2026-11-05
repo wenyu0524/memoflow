@@ -13,9 +13,7 @@
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-  border: 1px solid var(--color-glass-border);
   border-radius: 20px;
   background: var(--color-glass);
-  box-shadow: var(--shadow-widget);
 }
 </style>
