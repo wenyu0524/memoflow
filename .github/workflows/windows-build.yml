@@ -16,13 +16,15 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           cache: npm
       - name: Install Rust stable
         run: rustup toolchain install stable --profile minimal --no-self-update
       - name: Select Rust stable
         run: rustup default stable
       - run: npm ci
+      - name: Check desktop pet movement and window configuration
+        run: node --test tests/pet-motion.test.mjs tests/desktop-config.test.mjs
       - name: Build executable and installer
         run: npm run tauri:build
       - name: Upload standalone executable

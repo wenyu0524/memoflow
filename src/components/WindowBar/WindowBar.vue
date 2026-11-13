@@ -3,9 +3,11 @@ import { computed } from 'vue';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { Lock, Maximize2, Pin, PinOff, Unlock, X } from '@lucide/vue';
 import { useThemeStore } from '@/store/theme/themeStore';
+import { usePetStore } from '@/store/pet/petStore';
 import { isTauriRuntime } from '@/utils/environment/isTauri';
 
 const settingsStore = useThemeStore();
+const petStore = usePetStore();
 
 const pinned = computed(() => settingsStore.settings?.alwaysOnTop ?? false);
 const locked = computed(() => settingsStore.settings?.editingLocked ?? false);
@@ -50,6 +52,7 @@ async function toggleMaximize() {
 
     <div class="window-actions" aria-label="窗口操作">
       <slot />
+      <button class="pet-control" type="button" :class="{ active: petStore.visible }" :aria-pressed="petStore.visible" :aria-label="petStore.visible ? '隐藏桌宠' : '显示桌宠'" :title="petStore.visible ? '隐藏桌宠' : '显示桌宠'" :disabled="petStore.busy" @click="petStore.setVisible(!petStore.visible)">桌宠</button>
       <button v-if="!locked" type="button" title="最大化/还原" aria-label="最大化/还原" @click="toggleMaximize">
         <Maximize2 :size="15" />
       </button>
@@ -79,11 +82,13 @@ async function toggleMaximize() {
         <X :size="15" />
       </button>
     </div>
+    <p v-if="petStore.error" class="pet-control-error" role="alert">{{ petStore.error }}</p>
   </header>
 </template>
 
 <style scoped>
 .window-bar {
+  position: relative;
   display: grid;
   grid-template-columns: 1fr auto;
   align-items: center;
@@ -91,6 +96,10 @@ async function toggleMaximize() {
   padding: 6px 10px 6px 18px;
   user-select: none;
 }
+
+.pet-control { width: auto; min-width: 44px; padding: 0 8px; border-radius: 8px; font-size: 12px; }
+.pet-control:disabled { cursor: wait; opacity: .6; }
+.pet-control-error { position: absolute; z-index: 15; right: 12px; top: 30px; padding: 8px 12px; border-radius: 8px; background: var(--color-glass); color: var(--color-text); box-shadow: 0 3px 12px #0002; font-size: 12px; }
 
 .drag-zone {
   height: 100%;

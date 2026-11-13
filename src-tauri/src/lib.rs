@@ -69,12 +69,43 @@ fn show_main_window(app: &AppHandle) {
     }
 }
 
+fn set_pet_visible(app: &AppHandle, visible: bool) -> Result<bool, String> {
+    let window = app.get_webview_window("pet").ok_or("pet window is unavailable")?;
+    let result = if visible { window.show() } else { window.hide() };
+    result.map_err(|error| error.to_string())?;
+    let _ = app.emit("pet-visibility-changed", visible);
+    Ok(visible)
+}
+
+#[tauri::command]
+fn get_pet_visibility(app: AppHandle) -> Result<bool, String> {
+    app.get_webview_window("pet").ok_or("pet window is unavailable")?
+        .is_visible().map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+fn set_pet_visibility(app: AppHandle, visible: bool) -> Result<bool, String> {
+    set_pet_visible(&app, visible)
+}
+
+#[tauri::command]
+fn toggle_pet_visibility(app: AppHandle) -> Result<bool, String> {
+    let visible = get_pet_visibility(app.clone())?;
+    set_pet_visible(&app, !visible)
+}
+
+#[tauri::command]
+fn open_main_window(app: AppHandle) {
+    show_main_window(&app);
+}
+
 fn create_tray(app: &AppHandle) -> tauri::Result<()> {
     let show_item = MenuItem::with_id(app, "show", "显示", true, None::<&str>)?;
     let pin_item = MenuItem::with_id(app, "pin", "置顶", true, None::<&str>)?;
     let lock_item = MenuItem::with_id(app, "lock", "锁定", true, None::<&str>)?;
+    let pet_item = MenuItem::with_id(app, "pet", "显示/隐藏桌宠", true, None::<&str>)?;
     let quit_item = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
-    let menu = Menu::with_items(app, &[&show_item, &pin_item, &lock_item, &quit_item])?;
+    let menu = Menu::with_items(app, &[&show_item, &pin_item, &lock_item, &pet_item, &quit_item])?;
     let icon = tauri::image::Image::from_bytes(include_bytes!("../icons/icon.png"))?;
 
     TrayIconBuilder::with_id("main-tray")
@@ -90,6 +121,7 @@ fn create_tray(app: &AppHandle) -> tauri::Result<()> {
                 let _ = app.emit("tray-toggle-lock", ());
             }
             "quit" => app.exit(0),
+            "pet" => { let _ = toggle_pet_visibility(app.clone()); }
             _ => {}
         })
         .on_tray_icon_event(|tray, event| {
@@ -118,7 +150,7 @@ pub fn run() {
                 .with_state_flags(StateFlags::POSITION | StateFlags::SIZE)
                 .build(),
         )
-        .invoke_handler(tauri::generate_handler![read_data_file, write_data_file])
+        .invoke_handler(tauri::generate_handler![read_data_file, write_data_file, get_pet_visibility, set_pet_visibility, toggle_pet_visibility, open_main_window])
         .setup(|app| {
             create_tray(app.handle())?;
 
@@ -127,7 +159,11 @@ pub fn run() {
         .on_window_event(|window, event| {
             if let WindowEvent::CloseRequested { api, .. } = event {
                 api.prevent_close();
-                let _ = window.hide();
+                if window.label() == "pet" {
+                    let _ = set_pet_visible(window.app_handle(), false);
+                } else {
+                    let _ = window.hide();
+                }
             }
         })
         .run(tauri::generate_context!())

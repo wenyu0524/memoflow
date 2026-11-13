@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref } from 'vue';
+import { listen } from '@tauri-apps/api/event';
+import PetPage from '@/pages/Pet/PetPage.vue';
 import GlassCard from '@/components/GlassCard/GlassCard.vue';
 import MemoPanel from '@/components/MemoPanel/MemoPanel.vue';
 import RichTextToolbar from '@/components/RichTextToolbar/RichTextToolbar.vue';
@@ -9,12 +11,16 @@ import WindowBar from '@/components/WindowBar/WindowBar.vue';
 import { useMemoStore } from '@/store/memo/memoStore';
 import { useThemeStore } from '@/store/theme/themeStore';
 import { useTodoStore } from '@/store/todo/todoStore';
+import { usePetStore } from '@/store/pet/petStore';
+import { isTauriRuntime } from '@/utils/environment/isTauri';
 import { watchSystemTheme } from '@/utils/theme/applyTheme';
 import { bindTrayWindowEvents, initializeWindowBehavior } from '@/utils/window/windowLifecycle';
 
 const memoStore = useMemoStore();
 const themeStore = useThemeStore();
 const todoStore = useTodoStore();
+const petStore = usePetStore();
+const native = isTauriRuntime();
 const memoOpen = ref(false);
 const todoWidth = ref(65);
 const layout = ref<HTMLElement | null>(null);
@@ -50,6 +56,7 @@ function resizeWithKeyboard(event: KeyboardEvent) {
 
 let stopThemeWatcher: (() => void) | undefined;
 let stopTrayEvents: (() => void) | undefined;
+let stopPetEvents: (() => void) | undefined;
 
 async function togglePinnedFromTray() {
   await themeStore.setAlwaysOnTop(!(themeStore.settings?.alwaysOnTop ?? false));
@@ -62,10 +69,16 @@ async function toggleLockedFromTray() {
 }
 
 onMounted(async () => {
+  if (native) {
+    stopPetEvents = await listen<boolean>('pet-visibility-changed', ({ payload }) => {
+      petStore.visible = payload;
+    });
+  }
   await Promise.all([
     themeStore.hydrate(),
     todoStore.hydrate(),
     memoStore.hydrate(),
+    petStore.hydrate(),
   ]);
 
   stopThemeWatcher = watchSystemTheme(() => themeStore.mode);
@@ -79,6 +92,7 @@ onMounted(async () => {
 onUnmounted(() => {
   stopThemeWatcher?.();
   stopTrayEvents?.();
+  stopPetEvents?.();
 });
 </script>
 
@@ -102,9 +116,13 @@ onUnmounted(() => {
       </div>
     </GlassCard>
   </main>
+  <div v-if="!native && petStore.visible" class="pet-preview-overlay">
+    <PetPage />
+  </div>
 </template>
 
 <style scoped>
+.pet-preview-overlay { position: fixed; right: 16px; bottom: 12px; width: 200px; height: 240px; z-index: 20; pointer-events: none; }
 .app-shell {
   position: relative;
   display: flex;
