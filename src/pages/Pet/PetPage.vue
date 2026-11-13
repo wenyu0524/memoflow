@@ -6,13 +6,14 @@ import { currentMonitor, getCurrentWindow, PhysicalPosition } from '@tauri-apps/
 import PetCharacter from '@/components/DesktopPet/PetCharacter.vue';
 import { usePetStore } from '@/store/pet/petStore';
 import { isTauriRuntime } from '@/utils/environment/isTauri';
-import { getWalkingPath } from '@/utils/pet/petMotion';
+import { createActivityPlan, type PetAction } from '@/utils/pet/petMotion';
 
 const native = isTauriRuntime();
 const petStore = usePetStore();
 const root = ref<HTMLElement | null>(null);
-const action = ref<'idle' | 'walking' | 'jumping'>('idle');
+const action = ref<PetAction>('idle');
 const direction = ref<-1 | 1>(1);
+const lookY = ref(0);
 const roaming = ref(!window.matchMedia('(prefers-reduced-motion: reduce)').matches);
 const menuOpen = ref(false);
 const speech = ref('');
@@ -31,10 +32,10 @@ const unlisten: UnlistenFn[] = [];
 function stopWalking() {
   walkGeneration++;
   window.clearTimeout(walkTimer);
-  if (action.value === 'walking') action.value = 'idle';
+  if (action.value === 'walking' || action.value === 'running') action.value = 'idle';
 }
 
-function scheduleWalk(delay = 10000 + Math.random() * 7000) {
+function scheduleWalk(delay = 900 + Math.random() * 2400) {
   window.clearTimeout(walkTimer);
   if (!disposed && visible && roaming.value && !menuOpen.value) {
     walkTimer = window.setTimeout(() => { void walk(); }, delay);
@@ -54,25 +55,36 @@ async function walk() {
     const position = appWindow ? await appWindow.outerPosition() : { x: rect.x, y: rect.y };
     const size = appWindow ? await appWindow.outerSize() : { width: rect.width, height: rect.height };
     const area = monitor?.workArea ?? { position: { x: 0, y: 0 }, size: { width: window.innerWidth, height: window.innerHeight } };
-    const path = getWalkingPath(position, size, area, direction.value, native ? 80 * (monitor?.scaleFactor ?? 1) : 64);
+    const path = createActivityPlan(position, size, area, Math.random, monitor?.scaleFactor ?? 1);
     if (generation !== walkGeneration || disposed || !visible || drag) return;
     direction.value = path.direction;
-    action.value = 'walking';
+    lookY.value = path.lookY;
+    action.value = path.mode;
     const startOffset = { ...offset.value };
-    for (let step = 1; step <= 30; step++) {
+    const distance = Math.hypot(path.end.x - path.start.x, path.end.y - path.start.y);
+    let travelled = 0;
+    let lastFrame = performance.now();
+    while (travelled < distance) {
       if (generation !== walkGeneration || disposed || !visible || drag || !roaming.value) break;
-      const x = Math.round(path.start.x + (path.end.x - path.start.x) * step / 30);
+      const now = performance.now();
+      const elapsed = Math.min((now - lastFrame) / 1000, .08);
+      lastFrame = now;
+      if (path.burstAt !== null && travelled / distance >= path.burstAt) action.value = 'running';
+      const speed = action.value === 'running' ? path.runSpeed : path.walkSpeed;
+      travelled = Math.min(distance, travelled + speed * elapsed);
+      const progress = travelled / distance;
+      const x = Math.round(path.start.x + (path.end.x - path.start.x) * progress);
+      const y = Math.round(path.start.y + (path.end.y - path.start.y) * progress);
       if (appWindow) {
-        await appWindow.setPosition(new PhysicalPosition(x, path.start.y));
+        await appWindow.setPosition(new PhysicalPosition(x, y));
       } else {
-        offset.value = { x: startOffset.x + x - position.x, y: startOffset.y + path.start.y - position.y };
+        offset.value = { x: startOffset.x + x - position.x, y: startOffset.y + y - position.y };
       }
-      await new Promise<void>((resolve) => window.setTimeout(resolve, 70));
+      await new Promise<void>((resolve) => window.setTimeout(resolve, 32));
     }
     if (generation === walkGeneration && !disposed) {
       action.value = 'idle';
-      if (Math.random() > .5) direction.value = direction.value === 1 ? -1 : 1;
-      scheduleWalk();
+      scheduleWalk(path.pause);
     }
   } catch {
     if (!disposed && generation === walkGeneration) {
@@ -168,12 +180,12 @@ onMounted(async () => {
       const stopVisibility = await listen<boolean>('pet-visibility-changed', ({ payload }) => {
         visible = payload;
         stopWalking();
-        if (visible) scheduleWalk(5000);
+        if (visible) scheduleWalk(1200);
       });
       if (disposed) { stopVisibility(); return; }
       unlisten.push(stopVisibility);
       const stopMoved = await appWindow.onMoved(() => {
-        if (action.value !== 'walking') { stopWalking(); scheduleWalk(); }
+        if (action.value !== 'walking' && action.value !== 'running') { stopWalking(); scheduleWalk(); }
       });
       if (disposed) { stopMoved(); return; }
       unlisten.push(stopMoved);
@@ -195,7 +207,7 @@ onMounted(async () => {
     }
   }
   await nextTick();
-  if (!disposed) scheduleWalk(5000);
+  if (!disposed) scheduleWalk(1200);
 });
 
 onUnmounted(() => {
@@ -219,7 +231,7 @@ onUnmounted(() => {
       <button type="button" @click="hidePet">隐藏桌宠</button>
     </div>
     <button class="pet-body-button" type="button" aria-label="摸摸罗小黑，拖动可移动" title="点击摸摸，拖动移动，右键打开菜单" @pointerdown="startDrag" @pointermove="moveDrag" @pointerup="finishDrag" @pointercancel="finishDrag" @click="pet">
-      <PetCharacter :key="animationKey" :action="action" :direction="direction" />
+      <PetCharacter :key="animationKey" :action="action" :direction="direction" :look-y="lookY" />
     </button>
     <p v-if="petStore.error" class="pet-error" role="alert">{{ petStore.error }}</p>
   </section>
@@ -227,7 +239,7 @@ onUnmounted(() => {
 
 <style scoped>
 .pet-window { position: relative; flex: 0 0 auto; width: 200px; height: 240px; background: transparent; color: #34404a; user-select: none; pointer-events: auto; }
-.pet-body-button { position: absolute; left: 10px; bottom: 4px; width: 180px; height: 176px; display: grid; place-items: center; padding: 0; border: 0; background: transparent; cursor: grab; touch-action: none; }
+.pet-body-button { position: absolute; left: 5px; bottom: 4px; width: 190px; height: 192px; display: grid; place-items: center; padding: 0; border: 0; background: transparent; cursor: grab; touch-action: none; }
 .pet-body-button:active { cursor: grabbing; transform: none; }
 .pet-body-button:focus-visible { outline: 2px solid #89a4a2; outline-offset: -4px; border-radius: 24px; }
 .pet-speech { position: absolute; z-index: 2; top: 3px; left: 12px; right: 12px; padding: 8px 10px; border: 1px solid #d9e3de; border-radius: 14px; color: #34443d; background: #ffffffed; text-align: center; font-size: 12px; }

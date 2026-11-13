@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="zh-CN">
+<meta charset="utf-8">
+<title>罗小黑动作预览</title>
+<style>
+body { margin:0; padding:36px; color:#25423b; background:#eaf2ee; font:14px system-ui; }
+h1 { font-size:23px; } #gallery { display:flex; flex-wrap:wrap; gap:20px; }
+.card { display:grid; place-items:center; width:220px; padding:20px 10px; border:1px solid #d1e2d9; border-radius:22px; background:#f9fcfa; }
+.card h2 { font-size:14px; } button { margin:20px 0; padding:9px 14px; border:1px solid #bacec0; border-radius:10px; background:white; color:inherit; cursor:pointer; }
+pre { white-space:pre-wrap; line-height:1.7; }
+</style>
+<h1>罗小黑 · 坐姿、慢走、奔跑</h1><div id="gallery"></div><div id="controls"></div><pre id="results">检查中…</pre>
+<script type="module">
+import {createApp,h,nextTick,ref} from 'vue';
+import PetCharacter from '/src/components/DesktopPet/PetCharacter.vue';
+const direction = ref(1);
+createApp({render:()=>['idle','walking','running'].map((action,i)=>h('section',{class:'card'},[h('h2',['坐姿与待机','四足慢走','突然跑动'][i]),h(PetCharacter,{action,direction:direction.value})]))}).mount('#gallery');
+createApp({render:()=>h('button',{onClick:()=>{direction.value*=-1;}},'切换朝向')}).mount('#controls');
+await nextTick();
+const lines=[];
+function check(name,condition){lines.push(`${condition?'PASS':'FAIL'} ${name}`);}
+const walking=document.querySelector('.walking');
+const running=document.querySelector('.running');
+check('慢走和跑动均使用四条腿的姿态',walking.querySelectorAll('.leg').length===4&&running.querySelectorAll('.leg').length===4);
+check('奔跑步频快于慢走',parseFloat(getComputedStyle(running.querySelector('.leg')).animationDuration)<parseFloat(getComputedStyle(walking.querySelector('.leg')).animationDuration));
+check('奔跑和慢走的尾巴姿态不同',running.querySelector('.travel-tail path').getAttribute('d')!==walking.querySelector('.travel-tail path').getAttribute('d'));
+check('待机保留独立眨眼与耳朵动作',getComputedStyle(document.querySelector('.idle .eyes')).animationName!=='none'&&getComputedStyle(document.querySelector('.idle .left-ear')).animationName!=='none');
+document.querySelector('#results').textContent=lines.join('\n');
+document.title=`${lines.filter(l=>l.startsWith('PASS')).length}/${lines.length} PASS — 罗小黑动作`;
+</script>
+</html>
