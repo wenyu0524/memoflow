@@ -1,6 +1,6 @@
 interface Point { x: number; y: number }
 interface Size { width: number; height: number }
-export type PetAction = 'idle' | 'walking' | 'running' | 'jumping';
+export type PetAction = 'idle' | 'walking' | 'running' | 'jumping' | 'sitting' | 'sleeping';
 
 export function createActivityPlan(
   position: Point,
@@ -35,7 +35,6 @@ export function createActivityPlan(
   return {
     start, end, mode, burstAt,
     direction: (end.x >= start.x ? 1 : -1) as -1 | 1,
-    lookY: Math.sign(end.y - start.y) * 2,
     walkSpeed: 64 * scale,
     runSpeed: 275 * scale,
     pause: mode === 'running' ? 350 + random() * 850 : 900 + random() * 1900,

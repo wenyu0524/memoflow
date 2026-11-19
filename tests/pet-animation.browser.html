@@ -1,31 +1,34 @@
 <!doctype html>
 <html lang="zh-CN">
 <meta charset="utf-8">
-<title>罗小黑动作预览</title>
+<title>罗小黑图片帧动作预览</title>
 <style>
-body { margin:0; padding:36px; color:#25423b; background:#eaf2ee; font:14px system-ui; }
-h1 { font-size:23px; } #gallery { display:flex; flex-wrap:wrap; gap:20px; }
-.card { display:grid; place-items:center; width:220px; padding:20px 10px; border:1px solid #d1e2d9; border-radius:22px; background:#f9fcfa; }
-.card h2 { font-size:14px; } button { margin:20px 0; padding:9px 14px; border:1px solid #bacec0; border-radius:10px; background:white; color:inherit; cursor:pointer; }
+body { margin:0; padding:28px; color:#25423b; background:#eaf2ee; font:14px system-ui; }
+h1 { font-size:23px; } #gallery { display:flex; flex-wrap:wrap; gap:16px; }
+.card { display:grid; place-items:center; width:210px; padding:16px 8px; border:1px solid #d1e2d9; border-radius:22px; background:#f9fcfa; }
+.card h2 { font-size:14px; } button { margin:20px 8px 20px 0; padding:9px 14px; border:1px solid #bacec0; border-radius:10px; background:white; color:inherit; cursor:pointer; }
 pre { white-space:pre-wrap; line-height:1.7; }
 </style>
-<h1>罗小黑 · 坐姿、慢走、奔跑</h1><div id="gallery"></div><div id="controls"></div><pre id="results">检查中…</pre>
+<h1>罗小黑 · 原始图片帧动作</h1><div id="gallery"></div><div id="controls"></div><pre id="results">加载图片中…</pre>
 <script type="module">
 import {createApp,h,nextTick,ref} from 'vue';
 import PetCharacter from '/src/components/DesktopPet/PetCharacter.vue';
-const direction = ref(1);
-createApp({render:()=>['idle','walking','running'].map((action,i)=>h('section',{class:'card'},[h('h2',['坐姿与待机','四足慢走','突然跑动'][i]),h(PetCharacter,{action,direction:direction.value})]))}).mount('#gallery');
-createApp({render:()=>h('button',{onClick:()=>{direction.value*=-1;}},'切换朝向')}).mount('#controls');
+import {preloadPetFrames,petAnimations} from '/src/utils/pet/petFrames.ts';
+const direction=ref(1), replay=ref(0);
+const actions=['idle','walking','running','jumping','sitting','sleeping'];
+const names=['待机 · 快速眨眼','慢走 · 8 FPS','奔跑 · 12 FPS','跳跃 · 单次播放','坐下 · 快速眨眼','睡觉 · 3 FPS'];
+createApp({render:()=>actions.map((action,i)=>h('section',{class:'card'},[h('h2',names[i]),h(PetCharacter,{action,direction:direction.value,key:action==='jumping'?replay.value:action})]))}).mount('#gallery');
+createApp({render:()=>[h('button',{onClick:()=>{direction.value*=-1;}},'切换朝向'),h('button',{onClick:()=>{replay.value++;}},'重播跳跃')]}).mount('#controls');
+await preloadPetFrames();
 await nextTick();
+await Promise.all([...document.querySelectorAll('.pet-frame')].map(image=>image.decode()));
 const lines=[];
-function check(name,condition){lines.push(`${condition?'PASS':'FAIL'} ${name}`);}
-const walking=document.querySelector('.walking');
-const running=document.querySelector('.running');
-check('慢走和跑动均使用四条腿的姿态',walking.querySelectorAll('.leg').length===4&&running.querySelectorAll('.leg').length===4);
-check('奔跑步频快于慢走',parseFloat(getComputedStyle(running.querySelector('.leg')).animationDuration)<parseFloat(getComputedStyle(walking.querySelector('.leg')).animationDuration));
-check('奔跑和慢走的尾巴姿态不同',running.querySelector('.travel-tail path').getAttribute('d')!==walking.querySelector('.travel-tail path').getAttribute('d'));
-check('待机保留独立眨眼与耳朵动作',getComputedStyle(document.querySelector('.idle .eyes')).animationName!=='none'&&getComputedStyle(document.querySelector('.idle .left-ear')).animationName!=='none');
+function check(name,condition){lines.push((condition?'PASS':'FAIL')+' '+name);}
+check('六组动作均使用提供的 PNG 图片',document.querySelectorAll('.pet-frame').length===6&&[...document.querySelectorAll('.pet-frame')].every(image=>image.naturalWidth===512&&image.naturalHeight===512));
+check('待机和坐下使用快速眨眼时序，慢走和奔跑保持原速',[petAnimations.idle,petAnimations.sitting].every(animation=>animation.durations?.reduce((sum,ms)=>sum+ms,0)===2000)&&petAnimations.walking.fps===8&&petAnimations.running.fps===12);
+check('跳跃为单次序列，其余动作循环',!petAnimations.jumping.loop&&actions.filter(action=>action!=='jumping').every(action=>petAnimations[action].loop));
+check('默认向右运动时翻转原始向左素材',document.querySelector('.walking .pet-frame').classList.contains('flipped')&&document.querySelector('.running .pet-frame').classList.contains('flipped'));
 document.querySelector('#results').textContent=lines.join('\n');
-document.title=`${lines.filter(l=>l.startsWith('PASS')).length}/${lines.length} PASS — 罗小黑动作`;
+document.title=lines.filter(line=>line.startsWith('PASS')).length+'/'+lines.length+' PASS — 罗小黑图片帧';
 </script>
 </html>

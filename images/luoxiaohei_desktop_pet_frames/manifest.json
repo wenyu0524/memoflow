@@ -1,0 +1,87 @@
+{
+  "character": "罗小黑（经典黑猫造型参考）",
+  "frame_size": [
+    512,
+    512
+  ],
+  "format": "PNG_RGBA",
+  "animation_count": 6,
+  "frames_per_animation": 5,
+  "note": "基础待机和走路帧由图像生成得到；奔跑、跳跃、坐下采用基础素材逐帧变换；睡觉为匹配造型的补绘示意帧。",
+  "actions": {
+    "idle": {
+      "name_zh": "待机",
+      "fps": 2.5,
+      "frame_durations_ms": [1600, 50, 80, 135, 135],
+      "loop": true,
+      "frame_files": [
+        "frame_000.png",
+        "frame_001.png",
+        "frame_002.png",
+        "frame_003.png",
+        "frame_004.png"
+      ]
+    },
+    "walk": {
+      "name_zh": "走路",
+      "fps": 8,
+      "loop": true,
+      "frame_files": [
+        "frame_000.png",
+        "frame_001.png",
+        "frame_002.png",
+        "frame_003.png",
+        "frame_004.png"
+      ]
+    },
+    "run": {
+      "name_zh": "奔跑",
+      "fps": 12,
+      "loop": true,
+      "frame_files": [
+        "frame_000.png",
+        "frame_001.png",
+        "frame_002.png",
+        "frame_003.png",
+        "frame_004.png"
+      ]
+    },
+    "jump": {
+      "name_zh": "跳跃",
+      "fps": 8,
+      "loop": false,
+      "frame_files": [
+        "frame_000.png",
+        "frame_001.png",
+        "frame_002.png",
+        "frame_003.png",
+        "frame_004.png"
+      ]
+    },
+    "sit": {
+      "name_zh": "坐下",
+      "fps": 2.5,
+      "frame_durations_ms": [800, 800, 50, 80, 270],
+      "loop": true,
+      "frame_files": [
+        "frame_000.png",
+        "frame_001.png",
+        "frame_002.png",
+        "frame_003.png",
+        "frame_004.png"
+      ]
+    },
+    "sleep": {
+      "name_zh": "睡觉",
+      "fps": 3,
+      "loop": true,
+      "frame_files": [
+        "frame_000.png",
+        "frame_001.png",
+        "frame_002.png",
+        "frame_003.png",
+        "frame_004.png"
+      ]
+    }
+  }
+}

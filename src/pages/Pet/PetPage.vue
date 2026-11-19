@@ -7,13 +7,13 @@ import PetCharacter from '@/components/DesktopPet/PetCharacter.vue';
 import { usePetStore } from '@/store/pet/petStore';
 import { isTauriRuntime } from '@/utils/environment/isTauri';
 import { createActivityPlan, type PetAction } from '@/utils/pet/petMotion';
+import { getAnimationDuration } from '@/utils/pet/petFrames';
 
 const native = isTauriRuntime();
 const petStore = usePetStore();
 const root = ref<HTMLElement | null>(null);
 const action = ref<PetAction>('idle');
 const direction = ref<-1 | 1>(1);
-const lookY = ref(0);
 const roaming = ref(!window.matchMedia('(prefers-reduced-motion: reduce)').matches);
 const menuOpen = ref(false);
 const speech = ref('');
@@ -43,7 +43,7 @@ function scheduleWalk(delay = 900 + Math.random() * 2400) {
 }
 
 async function walk() {
-  if (disposed || !visible || drag || menuOpen.value || !roaming.value || action.value === 'jumping') return;
+  if (disposed || !visible || drag || menuOpen.value || !roaming.value || action.value === 'jumping' || action.value === 'sitting' || action.value === 'sleeping') return;
   const generation = ++walkGeneration;
   try {
     const rect = root.value?.getBoundingClientRect();
@@ -58,7 +58,6 @@ async function walk() {
     const path = createActivityPlan(position, size, area, Math.random, monitor?.scaleFactor ?? 1);
     if (generation !== walkGeneration || disposed || !visible || drag) return;
     direction.value = path.direction;
-    lookY.value = path.lookY;
     action.value = path.mode;
     const startOffset = { ...offset.value };
     const distance = Math.hypot(path.end.x - path.start.x, path.end.y - path.start.y);
@@ -108,7 +107,16 @@ function pet() {
   action.value = 'jumping';
   animationKey.value++;
   say(['喵～', '小黑陪着你。', '休息一下吧～'][Math.floor(Math.random() * 3)]);
-  jumpTimer = window.setTimeout(() => { action.value = 'idle'; scheduleWalk(); }, 700);
+  jumpTimer = window.setTimeout(() => { action.value = 'idle'; scheduleWalk(); }, getAnimationDuration('jumping'));
+}
+
+function rest(mode: 'sitting' | 'sleeping') {
+  stopWalking();
+  window.clearTimeout(jumpTimer);
+  roaming.value = false;
+  action.value = mode;
+  menuOpen.value = false;
+  say(mode === 'sleeping' ? '呼噜…点我叫醒。' : '坐下来休息一下。');
 }
 
 function startDrag(event: PointerEvent) {
@@ -153,7 +161,7 @@ function toggleRoaming() {
   roaming.value = !roaming.value;
   stopWalking();
   menuOpen.value = false;
-  if (roaming.value) scheduleWalk(300);
+  if (roaming.value) { action.value = 'idle'; scheduleWalk(300); }
 }
 
 async function hidePet() {
@@ -228,10 +236,12 @@ onUnmounted(() => {
       <button type="button" @click="openMemo">打开备忘录</button>
       <button type="button" :aria-pressed="roaming" @click="toggleRoaming">{{ roaming ? '✓ 自由活动' : '开启自由活动' }}</button>
       <button type="button" @click="pet(); menuOpen = false">摸摸小黑</button>
+      <button type="button" @click="rest('sitting')">坐下休息</button>
+      <button type="button" @click="rest('sleeping')">睡一会儿</button>
       <button type="button" @click="hidePet">隐藏桌宠</button>
     </div>
-    <button class="pet-body-button" type="button" aria-label="摸摸罗小黑，拖动可移动" title="点击摸摸，拖动移动，右键打开菜单" @pointerdown="startDrag" @pointermove="moveDrag" @pointerup="finishDrag" @pointercancel="finishDrag" @click="pet">
-      <PetCharacter :key="animationKey" :action="action" :direction="direction" :look-y="lookY" />
+    <button class="pet-body-button" type="button" :aria-label="action === 'sleeping' ? '叫醒罗小黑，拖动可移动' : '摸摸罗小黑，拖动可移动'" title="点击摸摸或叫醒，拖动移动，右键打开菜单" @pointerdown="startDrag" @pointermove="moveDrag" @pointerup="finishDrag" @pointercancel="finishDrag" @click="pet">
+      <PetCharacter :key="animationKey" :action="action" :direction="direction" />
     </button>
     <p v-if="petStore.error" class="pet-error" role="alert">{{ petStore.error }}</p>
   </section>
@@ -245,7 +255,7 @@ onUnmounted(() => {
 .pet-speech { position: absolute; z-index: 2; top: 3px; left: 12px; right: 12px; padding: 8px 10px; border: 1px solid #d9e3de; border-radius: 14px; color: #34443d; background: #ffffffed; text-align: center; font-size: 12px; }
 .pet-menu-trigger { position: absolute; z-index: 4; right: 8px; top: 37px; width: 26px; height: 23px; padding: 0; border: 1px solid #dbe5e0; border-radius: 9px; color: #52625a; background: #ffffffed; opacity: 0; cursor: pointer; font-size: 18px; line-height: 1; }
 .pet-window:hover .pet-menu-trigger, .pet-window:focus-within .pet-menu-trigger, .menu-open .pet-menu-trigger { opacity: 1; }
-.pet-menu { position: absolute; z-index: 3; top: 57px; left: 22px; right: 12px; display: grid; gap: 2px; padding: 10px; border: 1px solid #dbe5e0; border-radius: 14px; color: #34443d; background: #fffffff5; box-shadow: 0 5px 12px #12281d14; font-size: 12px; }
+.pet-menu { position: absolute; z-index: 3; top: 57px; left: 22px; right: 12px; display: grid; gap: 2px; max-height: 174px; overflow-y: auto; padding: 10px; border: 1px solid #dbe5e0; border-radius: 14px; color: #34443d; background: #fffffff5; box-shadow: 0 5px 12px #12281d14; font-size: 12px; }
 .pet-menu strong { padding: 2px 8px 5px; font-size: 12px; }
 .pet-menu button { min-height: 27px; padding: 4px 8px; border: 0; border-radius: 7px; color: inherit; background: transparent; text-align: left; cursor: pointer; }
 .pet-menu button:hover, .pet-menu button:focus-visible { background: #e8f2ec; }
