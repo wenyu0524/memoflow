@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="zh-CN">
 <meta charset="utf-8">
-<title>眯了宝图片帧动作预览</title>
+<title>咪了宝图片帧动作预览</title>
 <style>
 body { margin:0; padding:28px; color:#25423b; background:#eaf2ee; font:14px system-ui; }
 h1 { font-size:23px; } #gallery { display:flex; flex-wrap:wrap; gap:16px; }
@@ -9,7 +9,7 @@ h1 { font-size:23px; } #gallery { display:flex; flex-wrap:wrap; gap:16px; }
 .card h2 { font-size:14px; } button { margin:20px 8px 20px 0; padding:9px 14px; border:1px solid #bacec0; border-radius:10px; background:white; color:inherit; cursor:pointer; }
 pre { white-space:pre-wrap; line-height:1.7; }
 </style>
-<h1>眯了宝 · 原始图片帧动作</h1><div id="gallery"></div><div id="controls"></div><pre id="results">加载图片中…</pre>
+<h1>咪了宝 · 原始图片帧动作</h1><div id="gallery"></div><div id="controls"></div><pre id="results">加载图片中…</pre>
 <script type="module">
 import {createApp,h,nextTick,ref} from 'vue';
 import PetCharacter from '/src/components/DesktopPet/PetCharacter.vue';
@@ -29,6 +29,6 @@ check('待机快速眨眼，慢走和奔跑保持原速',petAnimations.idle.dura
 check('坐下和睡觉单次播放后保持姿势',['jumping','sitting','sleeping'].every(action=>!petAnimations[action].loop)&&['idle','walking','running'].every(action=>petAnimations[action].loop));
 check('原始素材朝右，向右运动时无需翻转',!document.querySelector('.walking .pet-frame').classList.contains('flipped')&&!document.querySelector('.running .pet-frame').classList.contains('flipped'));
 document.querySelector('#results').textContent=lines.join('\n');
-document.title=lines.filter(line=>line.startsWith('PASS')).length+'/'+lines.length+' PASS — 眯了宝图片帧';
+document.title=lines.filter(line=>line.startsWith('PASS')).length+'/'+lines.length+' PASS — 咪了宝图片帧';
 </script>
 </html>

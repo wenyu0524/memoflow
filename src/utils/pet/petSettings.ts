@@ -1,4 +1,4 @@
-export const petCharacters = { cream: '眯了宝', xiaohei: '罗小黑' } as const;
+export const petCharacters = { cream: '咪了宝', xiaohei: '罗小黑' } as const;
 export type PetCharacterId = keyof typeof petCharacters;
 export interface PetSettings {
   enabled: boolean;

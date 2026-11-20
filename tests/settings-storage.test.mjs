@@ -9,7 +9,7 @@ import { waitForWindowPaint } from '../src/utils/window/ready.ts';
 test('legacy pet preferences migrate while invalid values fall back to valid defaults', () => {
   assert.deepEqual(normalizePetSettings({ enabled:false, style:'strict', minutes:30 }), {enabled:false,style:'strict',minutes:30,autoStart:true,character:'cream'});
   assert.deepEqual(normalizePetSettings({enabled:'false',style:'unknown',minutes:-1,autoStart:null,character:'__proto__'}), normalizePetSettings(null));
-  assert.deepEqual(Object.values(petCharacters), ['眯了宝', '罗小黑']);
+  assert.deepEqual(Object.values(petCharacters), ['咪了宝', '罗小黑']);
   assert.equal(normalizePetSettings({autoStart:false,character:'xiaohei'}).autoStart, false);
 });
 test('invalid persisted structures are rejected before editing or saving', () => {

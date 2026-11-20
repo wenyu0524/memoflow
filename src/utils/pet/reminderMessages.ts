@@ -61,7 +61,7 @@ export function formatReminder(template: string, variables: Record<string, strin
   return template.replace(/\{(\w+)\}/g, (token, key: string) => String(variables[key] ?? token));
 }
 
-export function pickReminder(style: ReminderStyle, count: number, previous = '', random = Math.random, petName = '眯了宝') {
+export function pickReminder(style: ReminderStyle, count: number, previous = '', random = Math.random, petName = '咪了宝') {
   const scenario = count === 0 ? 'complete' : count === 1 ? 'one' : count >= 6 ? 'many' : 'several';
   const dynamic = dynamicMessages[style][scenario];
   // Alternate between count-aware and fixed wording, while never repeating the last sentence.

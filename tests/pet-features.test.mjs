@@ -10,7 +10,7 @@ test('all four styles have count-aware wording for one, several, many and comple
   for (const style of Object.keys(reminderStyles)) {
     for (const [count, scenario] of [[1, 'one'], [3, 'several'], [6, 'many'], [20, 'many'], [0, 'complete']]) {
       const text = pickReminder(style, count, '', () => 0);
-      assert.equal(text, formatReminder(dynamicMessages[style][scenario][0], { count, petName: '眯了宝' }));
+      assert.equal(text, formatReminder(dynamicMessages[style][scenario][0], { count, petName: '咪了宝' }));
       assert.ok(!text.includes('{count}'));
       if (count) assert.ok(text.includes(String(count)));
     }
