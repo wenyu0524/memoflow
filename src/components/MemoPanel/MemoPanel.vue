@@ -1,17 +1,22 @@
 <script setup lang="ts">
-import { nextTick, ref, watch } from 'vue';
+import { nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useMemoStore } from '@/store/memo/memoStore';
 import { useThemeStore } from '@/store/theme/themeStore';
 import { debounce } from '@/utils/function/debounce';
 import { insertPlainText, normalizeRichText } from '@/utils/richText/richText';
+import { registerEditorFlush } from '@/utils/storage/editorFlush';
 
 const memoStore = useMemoStore();
 const settingsStore = useThemeStore();
 const editor = ref<HTMLElement | null>(null);
 
 const saveMemo = debounce((value: string) => {
-  void memoStore.updateContent(value);
+  return memoStore.updateContent(value);
 }, 180);
+const unregister = registerEditorFlush(async () => { await saveMemo.flush(); });
+function flushWhenHidden() { if (document.visibilityState === 'hidden') void saveMemo.flush(); }
+onMounted(() => document.addEventListener('visibilitychange', flushWhenHidden));
+onUnmounted(() => { void saveMemo.flush(); unregister(); document.removeEventListener('visibilitychange', flushWhenHidden); });
 
 watch(
   () => memoStore.document.content,
@@ -50,6 +55,7 @@ function updateMemo(event: Event) {
       aria-label="备忘录"
       data-placeholder="写点什么..."
       @input="updateMemo"
+      @blur="saveMemo.flush()"
       @paste="insertPlainText"
     />
   </section>

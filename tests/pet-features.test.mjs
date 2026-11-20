@@ -10,7 +10,7 @@ test('all four styles have count-aware wording for one, several, many and comple
   for (const style of Object.keys(reminderStyles)) {
     for (const [count, scenario] of [[1, 'one'], [3, 'several'], [6, 'many'], [20, 'many'], [0, 'complete']]) {
       const text = pickReminder(style, count, '', () => 0);
-      assert.equal(text, formatReminder(dynamicMessages[style][scenario][0], { count }));
+      assert.equal(text, formatReminder(dynamicMessages[style][scenario][0], { count, petName: '眯了宝' }));
       assert.ok(!text.includes('{count}'));
       if (count) assert.ok(text.includes(String(count)));
     }
@@ -30,6 +30,7 @@ test('fixed and dynamic random pools never repeat the previous sentence', () => 
     }
   }
   assert.equal(formatReminder('还有 {count} 项，{name} 加油！', { count: 3, name: '小黑' }), '还有 3 项，小黑 加油！');
+  assert.ok(pickReminder('cute', 1, '', () => 0, '罗小黑').includes('罗小黑'));
 });
 test('celebrates completing the final task, not startup, empty lists or deleting the last pending task', () => {
   const pending = { remaining: 1, completed: 2, total: 3 };

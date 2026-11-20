@@ -6,6 +6,7 @@ import CircleCheckbox from '@/components/Checkbox/CircleCheckbox.vue';
 import { useThemeStore } from '@/store/theme/themeStore';
 import { useTodoStore } from '@/store/todo/todoStore';
 import { insertPlainText, isBlankRichText, normalizeRichText } from '@/utils/richText/richText';
+import { registerEditorFlush } from '@/utils/storage/editorFlush';
 
 const todoStore = useTodoStore();
 const settingsStore = useThemeStore();
@@ -14,6 +15,11 @@ const draftEmpty = ref(true);
 const itemEditors = new Map<string, HTMLElement>();
 const editingId = ref<string | null>(null);
 const editingSnapshot = ref('');
+const unregister = registerEditorFlush(async () => {
+  if (editingId.value) await finishItem(editingId.value);
+  if (!isBlankRichText(draftEditor.value?.innerHTML ?? '')) await addDraft();
+});
+onUnmounted(unregister);
 
 function setItemInput(id: string, element: Element | ComponentPublicInstance | null) {
   if (element instanceof HTMLElement) {
@@ -65,8 +71,8 @@ async function finishItem(id: string) {
   const html = itemEditors.get(id)?.innerHTML ?? '';
   editingId.value = null;
   window.getSelection()?.removeAllRanges();
-  await todoStore.updateTitle(id, html);
-  await todoStore.cleanupBlank(id);
+  if (isBlankRichText(html)) await todoStore.remove(id);
+  else await todoStore.updateTitle(id, html);
 }
 
 function toggleItem(id: string) {

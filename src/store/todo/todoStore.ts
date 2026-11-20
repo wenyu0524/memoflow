@@ -35,8 +35,10 @@ export const useTodoStore = defineStore('todo', {
       this.loaded = true;
     },
     async save() {
-      await writeJsonFile('todo', this.items);
-      useFeedbackStore().showSaved();
+      try {
+        await writeJsonFile('todo', this.items);
+        useFeedbackStore().showSaved();
+      } catch { /* The shared storage notice retains the unsaved snapshot for retry. */ }
     },
     async add(title: string) {
       const normalizedTitle = normalizeRichText(title);
@@ -69,22 +71,6 @@ export const useTodoStore = defineStore('todo', {
       }
 
       target.title = normalizeRichText(title);
-      target.updatedAt = timestamp();
-      await this.save();
-    },
-    async cleanupBlank(id: string) {
-      const target = this.items.find((item) => item.id === id);
-
-      if (!target) {
-        return;
-      }
-
-      if (isBlankRichText(target.title)) {
-        await this.remove(id);
-        return;
-      }
-
-      target.title = normalizeRichText(target.title);
       target.updatedAt = timestamp();
       await this.save();
     },

@@ -1,0 +1,95 @@
+{
+  "character": "fluffy cream-white long-haired cat, green eyes, pink nose and ears, pale-yellow knitted collar with mint-green ornaments",
+  "canvas": [
+    512,
+    512
+  ],
+  "format": "PNG RGBA transparent",
+  "frame_count_per_action": 5,
+  "actions": [
+    {
+      "id": "idle",
+      "name_zh": "待机",
+      "description": "呼吸、眨眼",
+      "fps": 7,
+      "frames": [
+        "frame_001.png",
+        "frame_002.png",
+        "frame_003.png",
+        "frame_004.png",
+        "frame_005.png"
+      ],
+      "preview": "preview.gif"
+    },
+    {
+      "id": "walk",
+      "name_zh": "行走",
+      "description": "四肢交替迈步",
+      "fps": 8,
+      "frames": [
+        "frame_001.png",
+        "frame_002.png",
+        "frame_003.png",
+        "frame_004.png",
+        "frame_005.png"
+      ],
+      "preview": "preview.gif"
+    },
+    {
+      "id": "run",
+      "name_zh": "奔跑",
+      "description": "快速奔跑循环",
+      "fps": 12,
+      "frames": [
+        "frame_001.png",
+        "frame_002.png",
+        "frame_003.png",
+        "frame_004.png",
+        "frame_005.png"
+      ],
+      "preview": "preview.gif"
+    },
+    {
+      "id": "jump",
+      "name_zh": "跳跃",
+      "description": "起跳、腾空、落地",
+      "fps": 8,
+      "frames": [
+        "frame_001.png",
+        "frame_002.png",
+        "frame_003.png",
+        "frame_004.png",
+        "frame_005.png"
+      ],
+      "preview": "preview.gif"
+    },
+    {
+      "id": "sit",
+      "name_zh": "坐下",
+      "description": "由站立过渡到坐姿",
+      "fps": 7,
+      "frames": [
+        "frame_001.png",
+        "frame_002.png",
+        "frame_003.png",
+        "frame_004.png",
+        "frame_005.png"
+      ],
+      "preview": "preview.gif"
+    },
+    {
+      "id": "sleep",
+      "name_zh": "睡觉",
+      "description": "趴卧、闭眼、安睡",
+      "fps": 3,
+      "frames": [
+        "frame_001.png",
+        "frame_002.png",
+        "frame_003.png",
+        "frame_004.png",
+        "frame_005.png"
+      ],
+      "preview": "preview.gif"
+    }
+  ]
+}

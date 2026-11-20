@@ -5,6 +5,7 @@ import { Lock, Maximize2, Pin, PinOff, Unlock, X } from '@lucide/vue';
 import { useThemeStore } from '@/store/theme/themeStore';
 import { usePetStore } from '@/store/pet/petStore';
 import { isTauriRuntime } from '@/utils/environment/isTauri';
+import PetSettingsPanel from '@/components/Settings/PetSettingsPanel.vue';
 
 const settingsStore = useThemeStore();
 const petStore = usePetStore();
@@ -52,6 +53,7 @@ async function toggleMaximize() {
 
     <div class="window-actions" aria-label="窗口操作">
       <slot />
+      <PetSettingsPanel />
       <button class="pet-control" type="button" :class="{ active: petStore.visible }" :aria-pressed="petStore.visible" :aria-label="petStore.visible ? '隐藏桌宠' : '显示桌宠'" :title="petStore.visible ? '隐藏桌宠' : '显示桌宠'" :disabled="petStore.busy" @click="petStore.setVisible(!petStore.visible)">桌宠</button>
       <button v-if="!locked" type="button" title="最大化/还原" aria-label="最大化/还原" @click="toggleMaximize">
         <Maximize2 :size="15" />
@@ -89,6 +91,7 @@ async function toggleMaximize() {
 <style scoped>
 .window-bar {
   position: relative;
+  z-index: 30;
   display: grid;
   grid-template-columns: 1fr auto;
   align-items: center;

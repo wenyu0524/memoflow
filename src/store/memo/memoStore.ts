@@ -29,12 +29,14 @@ export const useMemoStore = defineStore('memo', {
     },
     async updateContent(content: string) {
       this.document = {
-        content,
+        content: normalizeRichText(content),
         updatedAt: new Date().toISOString(),
       };
 
-      await writeJsonFile('memo', this.document);
-      useFeedbackStore().showSaved();
+      try {
+        await writeJsonFile('memo', this.document);
+        useFeedbackStore().showSaved();
+      } catch { /* The shared storage notice retains the unsaved snapshot for retry. */ }
     },
   },
 });

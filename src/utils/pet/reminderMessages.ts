@@ -24,7 +24,7 @@ const fixed: Record<ReminderStyle, string[]> = {
   ],
   encouraging: [
     '一步一步来，每完成一项都在向目标靠近。', '挑一件最容易开始的事，现在就行动吧！',
-    '你已经准备好了，小黑陪你把任务逐个完成。', '不用一次做好所有事，先专注眼前这一项。',
+    '你已经准备好了，{petName}陪你把任务逐个完成。', '不用一次做好所有事，先专注眼前这一项。',
     '每一次行动，都比停留在计划里更进一步。', '给自己一点时间，也给任务一个开始。',
     '今天的努力会积累起来，我们继续吧！', '先迈出一小步，你比自己想象的更有力量。',
   ],
@@ -32,10 +32,10 @@ const fixed: Record<ReminderStyle, string[]> = {
 
 export const dynamicMessages: Record<ReminderStyle, Record<'one' | 'several' | 'many' | 'complete', string[]>> = {
   cute: {
-    one: ['主人～只剩最后 {count} 项啦，小黑陪你收尾！', '还有最后 {count} 个小任务在等你，完成就抱抱～'],
-    several: ['还有 {count} 项任务等着你哟，我们一起加油！', '小黑数了数，还有 {count} 个小任务，慢慢来～'],
-    many: ['哇！{count} 项待办堆成小山啦，先完成一件好不好～', '还有 {count} 个小任务排着队，小黑陪你一个个来！'],
-    complete: ['太棒啦！任务全部完成，给你一个大大的抱抱！', '主人好厉害！待办清空啦，摸摸小黑庆祝一下～'],
+    one: ['主人～只剩最后 {count} 项啦，{petName}陪你收尾！', '还有最后 {count} 个小任务在等你，完成就抱抱～'],
+    several: ['还有 {count} 项任务等着你哟，我们一起加油！', '{petName}数了数，还有 {count} 个小任务，慢慢来～'],
+    many: ['哇！{count} 项待办堆成小山啦，先完成一件好不好～', '还有 {count} 个小任务排着队，{petName}陪你一个个来！'],
+    complete: ['太棒啦！任务全部完成，给你一个大大的抱抱！', '主人好厉害！待办清空啦，摸摸{petName}庆祝一下～'],
   },
   funny: {
     one: ['只剩 {count} 项！最后这位钉子户，安排一下？', '待办只剩 {count} 位选手，坚持到最后是吧！'],
@@ -52,7 +52,7 @@ export const dynamicMessages: Record<ReminderStyle, Record<'one' | 'several' | '
   encouraging: {
     one: ['只剩 {count} 项，你已经离完成很近了，稳稳收尾吧！', '最后 {count} 项了，再迈一步就能完成目标！'],
     several: ['还有 {count} 项任务，按优先级一步一步推进就好。', '{count} 项待办，先选一项开始，每一步都算数！'],
-    many: ['还有 {count} 项也没关系，先完成最重要的一项。', '{count} 项任务可以分成小步，小黑陪你逐个解决。'],
+    many: ['还有 {count} 项也没关系，先完成最重要的一项。', '{count} 项任务可以分成小步，{petName}陪你逐个解决。'],
     complete: ['所有任务完成！你的坚持值得好好庆祝。', '今天的任务全部完成，你做到了！给自己一个休息的奖励吧。'],
   },
 };
@@ -61,12 +61,12 @@ export function formatReminder(template: string, variables: Record<string, strin
   return template.replace(/\{(\w+)\}/g, (token, key: string) => String(variables[key] ?? token));
 }
 
-export function pickReminder(style: ReminderStyle, count: number, previous = '', random = Math.random) {
+export function pickReminder(style: ReminderStyle, count: number, previous = '', random = Math.random, petName = '眯了宝') {
   const scenario = count === 0 ? 'complete' : count === 1 ? 'one' : count >= 6 ? 'many' : 'several';
   const dynamic = dynamicMessages[style][scenario];
   // Alternate between count-aware and fixed wording, while never repeating the last sentence.
   const pool = count === 0 || random() < .6 ? dynamic : fixed[style];
-  const candidates = pool.map(message => formatReminder(message, { count })).filter(message => message !== previous);
+  const candidates = pool.map(message => formatReminder(message, { count, petName })).filter(message => message !== previous);
   return candidates[Math.min(candidates.length - 1, Math.floor(random() * candidates.length))];
 }
 

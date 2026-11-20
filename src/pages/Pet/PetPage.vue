@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { nextTick, onMounted, onUnmounted, ref } from 'vue';
+import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue';
 import { invoke } from '@tauri-apps/api/core';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import { availableMonitors, currentMonitor, getCurrentWindow, PhysicalPosition } from '@tauri-apps/api/window';
@@ -8,13 +8,17 @@ import PetAreaPicker from '@/components/DesktopPet/PetAreaPicker.vue';
 import { usePetStore } from '@/store/pet/petStore';
 import { isTauriRuntime } from '@/utils/environment/isTauri';
 import { createActivityPlan, type PetAction } from '@/utils/pet/petMotion';
-import { getAnimationDuration } from '@/utils/pet/petFrames';
+import { getAnimationDuration, preloadPetFrames } from '@/utils/pet/petFrames';
 import { clampPetPosition, intersectPetArea, validPetArea, type PetArea } from '@/utils/pet/petArea';
 import { usePetReminders } from '@/utils/pet/usePetReminders';
-import { reminderStyles } from '@/utils/pet/reminderMessages';
+import { usePetSettingsStore } from '@/store/pet/petSettingsStore';
+import { petCharacters } from '@/utils/pet/petSettings';
+import { waitForWindowPaint } from '@/utils/window/ready';
 
 const native = isTauriRuntime();
 const petStore = usePetStore();
+const petSettings = usePetSettingsStore();
+const petName = computed(() => petCharacters[petSettings.values.character]);
 const root = ref<HTMLElement | null>(null);
 const action = ref<PetAction>('idle');
 const direction = ref<-1 | 1>(1);
@@ -32,7 +36,7 @@ try {
   if (validPetArea(stored)) selectedArea.value = stored;
 } catch { /* Ignore invalid old area settings. */ }
 const visible = ref(true);
-const { preferences, snapshot, error: reminderError, remindNow } = usePetReminders(say,
+const { snapshot, error: reminderError, remindNow } = usePetReminders(say,
   () => visible.value && !menuOpen.value && !selecting.value && !dragging.value && !speech.value);
 let walkTimer: number | undefined;
 let jumpTimer: number | undefined;
@@ -192,8 +196,8 @@ function pet() {
   window.clearTimeout(jumpTimer);
   action.value = 'jumping';
   animationKey.value++;
-  say(['喵～', '小黑陪着你。', '休息一下吧～'][Math.floor(Math.random() * 3)]);
-  jumpTimer = window.setTimeout(() => { action.value = 'idle'; scheduleWalk(); }, getAnimationDuration('jumping'));
+  say(['喵～', `${petName.value}陪着你。`, '休息一下吧～'][Math.floor(Math.random() * 3)]);
+  jumpTimer = window.setTimeout(() => { action.value = 'idle'; scheduleWalk(); }, getAnimationDuration('jumping', petSettings.values.character));
 }
 
 function rest(mode: 'sitting' | 'sleeping') {
@@ -291,7 +295,7 @@ async function openMemo() {
     try { await invoke('open_main_window'); }
     catch { say('暂时无法打开备忘录，请重试。'); }
   } else {
-    say('小黑在这里陪你记事。');
+    say(`${petName.value}在这里陪你记事。`);
   }
   scheduleWalk();
 }
@@ -337,12 +341,18 @@ onMounted(async () => {
           localStorage.setItem('memoflow-pet-positioned', 'true');
         }
       }
-      if (!disposed) await petStore.setVisible(true);
     } catch {
-      if (!disposed) await petStore.setVisible(true);
+      if (!disposed) say('桌宠初始化暂时失败，请重新显示后重试。');
     }
   }
   await nextTick();
+  if (native && !disposed) {
+    try {
+      await petSettings.hydrate(); await preloadPetFrames(petSettings.values.character);
+      await waitForWindowPaint();
+      await invoke('complete_pet_startup');
+    } catch { say('桌宠图片或设置加载失败，请重启后重试。'); }
+  }
   if (!disposed) { queueConstrain(); scheduleWalk(1200); }
 });
 
@@ -360,27 +370,24 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <section ref="root" class="pet-window" :class="{ 'menu-open': menuOpen, native }" :style="{ transform: native ? undefined : `translate(${offset.x}px, ${offset.y}px)` }" aria-label="罗小黑桌宠" @contextmenu.prevent="toggleMenu" @keydown.esc="menuOpen = false; scheduleWalk()">
+  <section ref="root" class="pet-window" :class="{ 'menu-open': menuOpen, native }" :style="{ transform: native ? undefined : `translate(${offset.x}px, ${offset.y}px)` }" :aria-label="petName + '桌宠'" @contextmenu.prevent="toggleMenu" @keydown.esc="menuOpen = false; scheduleWalk()">
     <div v-if="speech" class="pet-speech" role="status" aria-live="polite">{{ speech }}</div>
     <button class="pet-menu-trigger" type="button" aria-label="桌宠菜单" :aria-expanded="menuOpen" @click="toggleMenu">···</button>
     <div v-if="menuOpen" class="pet-menu" aria-label="桌宠操作">
-      <strong>罗小黑</strong>
+      <strong>{{ petName }}</strong>
       <button type="button" @click="openMemo">打开备忘录</button>
-      <label class="pet-setting"><input v-model="preferences.enabled" type="checkbox" />待办提醒</label>
-      <label class="pet-setting">提醒风格<select v-model="preferences.style" aria-label="提醒风格"><option v-for="(label, key) in reminderStyles" :key="key" :value="key">{{ label }}</option></select></label>
-      <label class="pet-setting">提醒频率<select v-model.number="preferences.minutes" aria-label="提醒频率"><option v-for="minutes in [5,15,30,60]" :key="minutes" :value="minutes">每 {{ minutes }} 分钟</option></select></label>
       <span v-if="snapshot" class="pet-count">{{ snapshot.remaining }} 项未完成</span>
       <button type="button" :disabled="!snapshot || !!reminderError" @click="previewReminder">现在提醒一下</button>
       <button type="button" @click="selectArea">{{ selectedArea ? '重新框选活动区域' : '框选活动区域' }}</button>
       <button v-if="selectedArea" type="button" @click="saveArea(null); closeMenu()">取消区域限制</button>
       <button type="button" :aria-pressed="roaming" @click="toggleRoaming">{{ roaming ? '✓ 自由活动' : '开启自由活动' }}</button>
-      <button type="button" @click="pet(); menuOpen = false">摸摸小黑</button>
+      <button type="button" @click="pet(); menuOpen = false">摸摸{{ petName }}</button>
       <button type="button" @click="rest('sitting')">坐下休息</button>
       <button type="button" @click="rest('sleeping')">睡一会儿</button>
       <button type="button" @click="hidePet">隐藏桌宠</button>
     </div>
-    <button class="pet-body-button" type="button" :aria-label="action === 'sleeping' ? '叫醒罗小黑，拖动可移动' : '摸摸罗小黑，拖动可移动'" title="点击摸摸或叫醒，拖动移动，右键打开菜单" @pointerdown="startDrag" @pointermove="moveDrag" @pointerup="finishDrag" @pointercancel="finishDrag" @click="pet">
-      <PetCharacter :key="animationKey" :action="action" :direction="direction" />
+    <button class="pet-body-button" type="button" :aria-label="(action === 'sleeping' ? '叫醒' : '摸摸') + petName + '，拖动可移动'" title="点击摸摸或叫醒，拖动移动，右键打开菜单" @pointerdown="startDrag" @pointermove="moveDrag" @pointerup="finishDrag" @pointercancel="finishDrag" @click="pet">
+      <PetCharacter :key="petSettings.values.character + animationKey" :character="petSettings.values.character" :action="action" :direction="direction" />
     </button>
     <p v-if="petStore.error || reminderError" class="pet-error" role="alert">{{ petStore.error || reminderError }}</p>
   </section>

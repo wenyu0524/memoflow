@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from 'vue';
+import { nextTick, onMounted, onUnmounted, ref } from 'vue';
+import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import PetPage from '@/pages/Pet/PetPage.vue';
 import GlassCard from '@/components/GlassCard/GlassCard.vue';
@@ -8,6 +9,11 @@ import RichTextToolbar from '@/components/RichTextToolbar/RichTextToolbar.vue';
 import SaveToast from '@/components/SaveToast/SaveToast.vue';
 import TodoPanel from '@/components/TodoPanel/TodoPanel.vue';
 import WindowBar from '@/components/WindowBar/WindowBar.vue';
+import StorageNotice from '@/components/Settings/StorageNotice.vue';
+import { usePetSettingsStore } from '@/store/pet/petSettingsStore';
+import { flushEditors } from '@/utils/storage/editorFlush';
+import { flushPendingWrites } from '@/utils/storage/jsonStorage';
+import { waitForWindowPaint } from '@/utils/window/ready';
 import { useMemoStore } from '@/store/memo/memoStore';
 import { useThemeStore } from '@/store/theme/themeStore';
 import { useTodoStore } from '@/store/todo/todoStore';
@@ -20,6 +26,11 @@ const memoStore = useMemoStore();
 const themeStore = useThemeStore();
 const todoStore = useTodoStore();
 const petStore = usePetStore();
+const petSettings = usePetSettingsStore();
+const startupError = ref('');
+const initializing = ref(true);
+let disposed = false;
+let stopExit: (() => void) | undefined;
 const native = isTauriRuntime();
 const memoOpen = ref(false);
 const todoWidth = ref(65);
@@ -68,21 +79,39 @@ async function toggleLockedFromTray() {
   await initializeWindowBehavior(themeStore.settings);
 }
 
+async function loadMain() {
+  initializing.value = true; startupError.value = '';
+  try {
+    const results = await Promise.allSettled([themeStore.hydrate(), todoStore.hydrate(), memoStore.hydrate(), petStore.hydrate(), petSettings.hydrate()]);
+    if (results.some(result => result.status === 'rejected')) throw new Error('Data initialization failed');
+    if (disposed) return;
+    stopThemeWatcher?.(); stopThemeWatcher = watchSystemTheme(() => themeStore.mode);
+    await initializeWindowBehavior(themeStore.settings);
+    await petStore.setVisible(petSettings.values.autoStart);
+  } catch { if (!disposed) startupError.value = '数据读取失败，已暂停编辑以保护原文件。检查备份后可重试。'; }
+  finally {
+    initializing.value = false;
+    await nextTick();
+    await waitForWindowPaint();
+    if (native && !disposed) {
+      try { await invoke('complete_main_startup'); }
+      catch { startupError.value = '窗口初始化失败，请重新启动应用。'; }
+    }
+  }
+}
 onMounted(async () => {
   if (native) {
     stopPetEvents = await listen<boolean>('pet-visibility-changed', ({ payload }) => {
       petStore.visible = payload;
     });
+    stopExit = await listen('prepare-exit', async () => {
+      try {
+        await flushEditors(); await flushPendingWrites(); await invoke('exit_after_save');
+      } catch { await invoke('open_main_window'); }
+    });
   }
-  await Promise.all([
-    themeStore.hydrate(),
-    todoStore.hydrate(),
-    memoStore.hydrate(),
-    petStore.hydrate(),
-  ]);
-
-  stopThemeWatcher = watchSystemTheme(() => themeStore.mode);
-  await initializeWindowBehavior(themeStore.settings);
+  await loadMain();
+  if (disposed) return;
   stopTrayEvents = await bindTrayWindowEvents({
     togglePinned: togglePinnedFromTray,
     toggleLocked: toggleLockedFromTray,
@@ -90,6 +119,7 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
+  disposed = true; stopExit?.();
   stopThemeWatcher?.();
   stopTrayEvents?.();
   stopPetEvents?.();
@@ -103,7 +133,8 @@ onUnmounted(() => {
   >
     <RichTextToolbar />
     <SaveToast />
-    <GlassCard>
+    <StorageNotice />
+    <GlassCard :inert="initializing || !!startupError">
       <WindowBar>
         <button class="memo-toggle" type="button" :aria-expanded="memoOpen" aria-controls="memo-pane" @click="memoOpen = !memoOpen">
           {{ memoOpen ? '收起备忘录' : '备忘录' }}
@@ -115,6 +146,7 @@ onUnmounted(() => {
         <MemoPanel v-show="memoOpen" id="memo-pane" />
       </div>
     </GlassCard>
+    <aside v-if="startupError" class="startup-error" role="alert">{{ startupError }} <button type="button" @click="loadMain">重试读取</button></aside>
   </main>
   <div v-if="!native && petStore.visible" class="pet-preview-overlay">
     <PetPage />
@@ -122,6 +154,8 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
+.startup-error { position: fixed; z-index: 90; inset: 60px 20px auto; padding: 16px; border: 1px solid #d4b18a; border-radius: 12px; color: #6b4727; background: #fff6e7; font-size: 13px; }
+.startup-error button { margin-left: 8px; padding: 5px 10px; border-radius: 6px; cursor: pointer; }
 .pet-preview-overlay { position: fixed; right: 16px; bottom: 12px; width: 200px; height: 240px; z-index: 20; pointer-events: none; }
 .app-shell {
   position: relative;

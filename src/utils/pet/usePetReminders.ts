@@ -1,18 +1,14 @@
-import { onMounted, onUnmounted, reactive, ref, watch } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import { readJsonFile } from '@/utils/storage/jsonStorage';
 import { isTauriRuntime } from '@/utils/environment/isTauri';
-import { pickReminder, reminderStyles, shouldCelebrate, type ReminderStyle, type TodoSnapshot } from './reminderMessages';
+import { pickReminder, shouldCelebrate, type TodoSnapshot } from './reminderMessages';
+import { usePetSettingsStore } from '@/store/pet/petSettingsStore';
+import { petCharacters } from './petSettings';
 
-const preferenceKey = 'memoflow-pet-reminders';
 export function usePetReminders(say: (text: string, duration?: number) => void, canSpeak: () => boolean) {
-  const preferences = reactive({ enabled: true, style: 'cute' as ReminderStyle, minutes: 15 });
-  try {
-    const saved = JSON.parse(localStorage.getItem(preferenceKey) ?? '{}');
-    if (typeof saved.enabled === 'boolean') preferences.enabled = saved.enabled;
-    if (Object.hasOwn(reminderStyles, saved.style)) preferences.style = saved.style;
-    if ([5, 15, 30, 60].includes(saved.minutes)) preferences.minutes = saved.minutes;
-  } catch { /* Keep defaults when stored preferences are invalid. */ }
+  const settings = usePetSettingsStore();
+  const preferences = computed(() => settings.values);
   const snapshot = ref<TodoSnapshot>();
   const error = ref('');
   let previousMessage = '';
@@ -23,12 +19,12 @@ export function usePetReminders(say: (text: string, duration?: number) => void, 
   let unlisten: UnlistenFn | undefined;
 
   function message(count: number) {
-    previousMessage = pickReminder(preferences.style, count, previousMessage);
+    previousMessage = pickReminder(preferences.value.style, count, previousMessage, Math.random, petCharacters[preferences.value.character]);
     return previousMessage;
   }
-  function schedule(delay = preferences.minutes * 60_000) {
+  function schedule(delay = preferences.value.minutes * 60_000) {
     window.clearTimeout(timer);
-    if (!disposed && preferences.enabled && snapshot.value && snapshot.value.remaining > 0 && !error.value) {
+    if (!disposed && preferences.value.enabled && snapshot.value && snapshot.value.remaining > 0 && !error.value) {
       timer = window.setTimeout(() => {
         if (canSpeak()) { say(message(snapshot.value!.remaining), 7000); schedule(); }
         else schedule(30_000);
@@ -37,7 +33,7 @@ export function usePetReminders(say: (text: string, duration?: number) => void, 
   }
   function accept(current: TodoSnapshot) {
     if (current.remaining > 0) celebration = '';
-    if (shouldCelebrate(snapshot.value, current) && preferences.enabled) {
+    if (shouldCelebrate(snapshot.value, current) && preferences.value.enabled) {
       celebration = message(0);
       if (canSpeak()) { say(celebration, 7000); celebration = ''; }
     }
@@ -73,18 +69,18 @@ export function usePetReminders(say: (text: string, duration?: number) => void, 
   }
   const changed = () => { void refresh(); };
   watch(preferences, () => {
-    try { localStorage.setItem(preferenceKey, JSON.stringify(preferences)); }
-    catch { error.value = '提醒设置暂时无法保存，重启后可能恢复默认。'; }
-    if (!preferences.enabled) celebration = '';
+    if (!preferences.value.enabled) celebration = '';
     schedule();
   });
   watch(canSpeak, active => {
-    if (active && celebration && preferences.enabled) { say(celebration, 7000); celebration = ''; }
+    if (active && error.value) void refresh();
+    if (active && celebration && preferences.value.enabled) { say(celebration, 7000); celebration = ''; }
   });
   onMounted(async () => {
     window.addEventListener('storage', storageChanged);
     window.addEventListener('memoflow-todos-changed', changed);
     try {
+      await settings.hydrate();
       if (isTauriRuntime()) {
         const stop = await listen('todos-changed', changed);
         if (disposed) { stop(); return; }

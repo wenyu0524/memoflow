@@ -1,17 +1,18 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import type { PetAction } from '@/utils/pet/petMotion';
-import { petAnimations, preloadPetFrames } from '@/utils/pet/petFrames';
+import { getPetAnimations, preloadPetFrames } from '@/utils/pet/petFrames';
+import type { PetCharacterId } from '@/utils/pet/petSettings';
 import { getFrameIndex, getTimedFrame } from '@/utils/pet/framePlayback';
 
-const props = defineProps<{ action: PetAction; direction: -1 | 1 }>();
-const animation = computed(() => petAnimations[props.action]);
+const props = withDefaults(defineProps<{ action: PetAction; direction: -1 | 1; character?: PetCharacterId }>(), { character: 'cream' });
+const animation = computed(() => getPetAnimations(props.character)[props.action]);
 const frameIndex = ref(0);
 const ready = ref(false);
 const failed = ref(false);
 const media = window.matchMedia('(prefers-reduced-motion: reduce)');
 const reducedMotion = ref(media.matches);
-const flipped = computed(() => props.direction === 1 && ['walking', 'running', 'jumping'].includes(props.action));
+const flipped = computed(() => props.direction === (props.character === 'cream' ? -1 : 1) && ['walking', 'running', 'jumping'].includes(props.action));
 let timer: number | undefined;
 let startedAt = 0;
 let disposed = false;
@@ -42,7 +43,7 @@ watch([() => props.action, ready, reducedMotion], restart, { immediate: true });
 onMounted(async () => {
   media.addEventListener('change', motionChanged);
   try {
-    await preloadPetFrames();
+    await preloadPetFrames(props.character);
     if (!disposed) ready.value = true;
   } catch {
     if (!disposed) failed.value = true;

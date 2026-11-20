@@ -1,3 +1,5 @@
+export const idleBlinkDurations = [800, 800, 60, 70, 270];
+
 export function getFrameIndex(elapsedMs: number, fps: number, frameCount: number, loop: boolean) {
   if (frameCount < 1) return 0;
   const index = Math.max(0, Math.floor(elapsedMs * fps / 1000));

@@ -1,0 +1,35 @@
+<!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>设置与存储回归检查</title>
+<style>body{font:14px system-ui;background:#edf4ef;color:#29483a;padding:28px}h1{font-size:22px}pre{line-height:1.9;white-space:pre-wrap}</style>
+<h1>设置与存储回归检查</h1><p>仅在隔离端口 1424 运行；使用测试数据验证保存顺序、备份恢复、失败重试及富文本清理。</p><pre id="results">运行中…</pre>
+<script type="module">
+import {writeJsonFile,readJsonFile,storageStatus,retryFailedWrites} from '/src/utils/storage/jsonStorage.ts';
+import {normalizeRichText} from '/src/utils/richText/richText.ts';
+const lines=[];
+function check(name,condition){lines.push((condition?'PASS ':'FAIL ')+name);document.querySelector('#results').textContent=lines.join('\n');}
+if(location.hostname!=='127.0.0.1'||location.port!=='1424')throw new Error('Use isolated test port 1424');
+const memo=content=>({content,updatedAt:null});
+await Promise.all([writeJsonFile('memo',memo('first')),writeJsonFile('memo',memo('second')),writeJsonFile('memo',memo('latest'))]);
+check('快速保存按顺序完成，最终保留最新内容',(await readJsonFile('memo')).content==='latest');
+check('保留上一个成功版本的备份',JSON.parse(localStorage.getItem('memo.json.bak')).content==='second');
+localStorage.setItem('memo.json','broken');
+check('损坏数据从备份恢复',(await readJsonFile('memo')).content==='second');
+check('损坏原始内容保留，不会静默丢弃',localStorage.getItem('memo.json.corrupt')==='broken');
+localStorage.removeItem('memo.json.bak');localStorage.setItem('memo.json','broken-without-backup');
+let rejected=false;try{await readJsonFile('memo');}catch{rejected=true;}
+check('没有有效备份时拒绝把损坏数据替换为空内容',rejected&&localStorage.getItem('memo.json')==='broken-without-backup');
+await writeJsonFile('memo',memo('recovered'));
+const original=Storage.prototype.setItem;
+try{
+ Storage.prototype.setItem=function(key,value){if(key==='memo.json')throw new DOMException('full','QuotaExceededError');return original.call(this,key,value);};
+ try{await writeJsonFile('memo',memo('retry this'));}catch{}
+ check('磁盘/存储配额失败保留待重试内容',storageStatus().failedFiles.includes('memo.json')&&JSON.parse(localStorage.getItem('memo.json')).content==='recovered');
+}finally{Storage.prototype.setItem=original;}
+await retryFailedWrites();
+check('重试恢复保存并清除失败状态',(await readJsonFile('memo')).content==='retry this'&&!storageStatus().failedFiles.length);
+const sanitized=normalizeRichText('<svg onload="alert(1)"><script>alert(2)<\/script></svg><img src="https://invalid.test/x" onerror="alert(3)"><iframe srcdoc="evil"></iframe><form><input></form><a href="javascript:alert(4)">文字</a><b onclick="evil()">加粗</b><span style="color:red;font-size:18px;background-image:url(https://invalid.test/x)">格式</span>');
+const node=document.createElement('template');node.innerHTML=sanitized;
+check('主动内容、危险属性和外部资源不会进入编辑器',!node.content.querySelector('svg,img,script,iframe,form,input,a,[onclick],[src],[href]')&&!sanitized.includes('background-image'));
+check('保留文字、加粗、字号及文字颜色',sanitized.includes('文字')&&Boolean(node.content.querySelector('b'))&&sanitized.includes('18px')&&sanitized.includes('color'));
+await writeJsonFile('memo',memo(''));
+document.title=lines.filter(line=>line.startsWith('PASS')).length+'/'+lines.length+' PASS — 设置与存储';
+</script></html>

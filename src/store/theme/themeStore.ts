@@ -48,7 +48,7 @@ export const useThemeStore = defineStore('theme', {
       };
 
       this.settings = nextSettings;
-      await writeJsonFile('settings', nextSettings);
+      await writeJsonFile('settings', nextSettings).catch(() => {});
     },
     async setAlwaysOnTop(alwaysOnTop: boolean) {
       if (!this.settings) {
@@ -61,7 +61,7 @@ export const useThemeStore = defineStore('theme', {
       };
 
       this.settings = nextSettings;
-      await writeJsonFile('settings', nextSettings);
+      await writeJsonFile('settings', nextSettings).catch(() => {});
     },
     async setEditingLocked(editingLocked: boolean) {
       if (!this.settings) {
@@ -74,7 +74,7 @@ export const useThemeStore = defineStore('theme', {
       };
 
       this.settings = nextSettings;
-      await writeJsonFile('settings', nextSettings);
+      await writeJsonFile('settings', nextSettings).catch(() => {});
     },
   },
 });

@@ -1,15 +1,21 @@
 <script setup lang="ts">
+import { onUnmounted } from 'vue';
 import HomePage from '@/pages/Home/HomePage.vue';
 import PetPage from '@/pages/Pet/PetPage.vue';
 import PetAreaPage from '@/pages/Pet/PetAreaPage.vue';
 import { isTauriRuntime } from '@/utils/environment/isTauri';
 import { usePetStore } from '@/store/pet/petStore';
+import { usePetSettingsStore } from '@/store/pet/petSettingsStore';
 
 const petWindow = new URLSearchParams(window.location.search).get('view') === 'pet';
 const areaWindow = new URLSearchParams(window.location.search).get('view') === 'pet-area';
 const preview = petWindow && !isTauriRuntime();
 const petStore = usePetStore();
 if (preview) petStore.visible = true;
+let disposed = false;
+let stopSettings: (() => void) | undefined;
+void usePetSettingsStore().connect().then(stop => { if (disposed) stop(); else stopSettings = stop; });
+onUnmounted(() => { disposed = true; stopSettings?.(); });
 </script>
 
 <template>

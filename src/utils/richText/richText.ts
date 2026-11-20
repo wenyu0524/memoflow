@@ -35,11 +35,11 @@ export function flattenFontSizes(root: HTMLElement | DocumentFragment) {
 }
 
 export function getRichTextPlainText(html: string) {
-  const element = document.createElement('div');
+  const element = document.createElement('template');
 
   element.innerHTML = html;
 
-  return (element.textContent ?? '').replace(/\u00a0/g, ' ').trim();
+  return (element.content.textContent ?? '').replace(/\u00a0/g, ' ').trim();
 }
 
 export function isBlankRichText(html: string) {
@@ -50,8 +50,10 @@ export function normalizeRichText(html: string) {
   const template = document.createElement('template');
 
   template.innerHTML = html;
-  template.content.querySelectorAll('script, style, img, table, iframe').forEach((node) => node.remove());
+  template.content.querySelectorAll('script, style, img, table, iframe, object, embed, svg, math, form, input, button, textarea, select, link, meta, template, audio, video, source').forEach((node) => node.remove());
+  const allowedTags = new Set(['P', 'DIV', 'BR', 'SPAN', 'B', 'STRONG', 'I', 'EM', 'U', 'S', 'STRIKE', 'UL', 'OL', 'LI', 'BLOCKQUOTE', 'CODE', 'PRE']);
   template.content.querySelectorAll<HTMLElement>('*').forEach((node) => {
+    if (!allowedTags.has(node.tagName)) { node.replaceWith(...node.childNodes); return; }
     [...node.attributes].forEach((attribute) => {
       if (attribute.name !== 'style') {
         node.removeAttribute(attribute.name);

@@ -1,4 +1,5 @@
-use std::{fs, path::PathBuf};
+use std::{fs, path::PathBuf, sync::{Mutex, atomic::{AtomicBool, Ordering}}};
+mod storage;
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -9,12 +10,19 @@ use tauri::{
 };
 use tauri_plugin_window_state::{Builder as WindowStateBuilder, StateFlags};
 
-const ALLOWED_FILES: [&str; 3] = ["todo.json", "memo.json", "settings.json"];
+const ALLOWED_FILES: [&str; 4] = ["todo.json", "memo.json", "settings.json", "pet-settings.json"];
+#[derive(Default)]
+struct PetRuntime { ready: bool, requested: bool }
+#[derive(Default)]
+struct RuntimeState {
+    files: Mutex<()>, main_ready: AtomicBool, pet: Mutex<PetRuntime>,
+}
 
 fn default_json(file_name: &str) -> &'static str {
     match file_name {
         "todo.json" => "[]",
         "memo.json" => r#"{"content":"","updatedAt":null}"#,
+        "pet-settings.json" => r#"{"enabled":true,"style":"cute","minutes":15,"autoStart":true,"character":"cream"}"#,
         "settings.json" => {
             r#"{"themeMode":"auto","alwaysOnTop":false,"editingLocked":false,"window":{"x":null,"y":null,"width":650,"height":420}}"#
         }
@@ -43,25 +51,24 @@ fn data_file_path(app: &AppHandle, file_name: &str) -> Result<PathBuf, String> {
 }
 
 #[tauri::command]
-fn read_data_file(app: AppHandle, file_name: String) -> Result<Value, String> {
+async fn read_data_file(app: AppHandle, file_name: String) -> Result<Value, String> {
+    let state = app.state::<RuntimeState>();
+    let _guard = state.files.lock().map_err(|e| e.to_string())?;
     let path = data_file_path(&app, &file_name)?;
-
-    if !path.exists() {
-        fs::write(&path, default_json(&file_name)).map_err(|error| error.to_string())?;
-    }
-
-    let content = fs::read_to_string(&path).map_err(|error| error.to_string())?;
-
-    serde_json::from_str(&content).map_err(|error| error.to_string())
+    let (data, recovered) = storage::read(&path, &file_name, default_json(&file_name))?;
+    if recovered { let _ = app.emit("storage-recovered", &file_name); }
+    Ok(data)
 }
 
 #[tauri::command]
-fn write_data_file(app: AppHandle, file_name: String, data: Value) -> Result<(), String> {
+async fn write_data_file(app: AppHandle, window: tauri::WebviewWindow, file_name: String, data: Value) -> Result<(), String> {
+    if window.label() != "main" { return Err("only the main window can write application data".into()); }
+    let state = app.state::<RuntimeState>();
+    let _guard = state.files.lock().map_err(|e| e.to_string())?;
     let path = data_file_path(&app, &file_name)?;
-    let content = serde_json::to_string_pretty(&data).map_err(|error| error.to_string())?;
-
-    fs::write(path, content).map_err(|error| error.to_string())?;
+    storage::write(&path, &file_name, &data)?;
     if file_name == "todo.json" { let _ = app.emit("todos-changed", ()); }
+    if file_name == "pet-settings.json" { let _ = app.emit("pet-settings-changed", data); }
     Ok(())
 }
 
@@ -116,6 +123,7 @@ fn cancel_pet_area_selection(app: AppHandle, window: tauri::WebviewWindow) -> Re
 }
 
 fn show_main_window(app: &AppHandle) {
+    if !app.state::<RuntimeState>().main_ready.load(Ordering::SeqCst) { return; }
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.show();
         let _ = window.set_focus();
@@ -123,11 +131,40 @@ fn show_main_window(app: &AppHandle) {
 }
 
 fn set_pet_visible(app: &AppHandle, visible: bool) -> Result<bool, String> {
+    let state = app.state::<RuntimeState>();
+    let mut pet = state.pet.lock().map_err(|e| e.to_string())?;
+    pet.requested = visible;
+    if visible && !pet.ready { return Ok(false); }
+    apply_pet_visible(app, visible)
+}
+
+fn apply_pet_visible(app: &AppHandle, visible: bool) -> Result<bool, String> {
     let window = app.get_webview_window("pet").ok_or("pet window is unavailable")?;
     let result = if visible { window.show() } else { window.hide() };
     result.map_err(|error| error.to_string())?;
     let _ = app.emit("pet-visibility-changed", visible);
     Ok(visible)
+}
+
+#[tauri::command]
+fn complete_main_startup(app: AppHandle, window: tauri::WebviewWindow) -> Result<(), String> {
+    if window.label() != "main" { return Err("main window required".into()); }
+    app.state::<RuntimeState>().main_ready.store(true, Ordering::SeqCst);
+    window.show().map_err(|e| e.to_string())?;
+    window.set_focus().map_err(|e| e.to_string())
+}
+#[tauri::command]
+fn complete_pet_startup(app: AppHandle, window: tauri::WebviewWindow) -> Result<(), String> {
+    if window.label() != "pet" { return Err("pet window required".into()); }
+    let state = app.state::<RuntimeState>();
+    let mut pet = state.pet.lock().map_err(|e| e.to_string())?;
+    pet.ready = true;
+    apply_pet_visible(&app, pet.requested)?; Ok(())
+}
+#[tauri::command]
+fn exit_after_save(app: AppHandle, window: tauri::WebviewWindow) -> Result<(), String> {
+    if window.label() != "main" { return Err("main window required".into()); }
+    app.exit(0); Ok(())
 }
 
 #[tauri::command]
@@ -173,7 +210,7 @@ fn create_tray(app: &AppHandle) -> tauri::Result<()> {
             "lock" => {
                 let _ = app.emit("tray-toggle-lock", ());
             }
-            "quit" => app.exit(0),
+            "quit" => { let _ = app.emit("prepare-exit", ()); }
             "pet" => { let _ = toggle_pet_visibility(app.clone()); }
             _ => {}
         })
@@ -195,6 +232,7 @@ fn create_tray(app: &AppHandle) -> tauri::Result<()> {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .manage(RuntimeState::default())
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             show_main_window(app);
         }))
@@ -203,7 +241,7 @@ pub fn run() {
                 .with_state_flags(StateFlags::POSITION | StateFlags::SIZE)
                 .build(),
         )
-        .invoke_handler(tauri::generate_handler![read_data_file, write_data_file, get_pet_visibility, set_pet_visibility, toggle_pet_visibility, open_main_window, start_pet_area_selection, finish_pet_area_selection, cancel_pet_area_selection])
+        .invoke_handler(tauri::generate_handler![read_data_file, write_data_file, get_pet_visibility, set_pet_visibility, toggle_pet_visibility, open_main_window, start_pet_area_selection, finish_pet_area_selection, cancel_pet_area_selection, complete_main_startup, complete_pet_startup, exit_after_save])
         .setup(|app| {
             create_tray(app.handle())?;
 
