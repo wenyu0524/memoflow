@@ -1,6 +1,6 @@
 [package]
 name = "memoflow"
-version = "1.3.0"
+version = "1.4.0"
 description = "A lightweight Windows desktop memo widget."
 authors = ["MemoFlow"]
 edition = "2021"

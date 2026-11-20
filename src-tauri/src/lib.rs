@@ -1,5 +1,6 @@
 use std::{fs, path::PathBuf};
 
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tauri::{
     menu::{Menu, MenuItem},
@@ -59,7 +60,59 @@ fn write_data_file(app: AppHandle, file_name: String, data: Value) -> Result<(),
     let path = data_file_path(&app, &file_name)?;
     let content = serde_json::to_string_pretty(&data).map_err(|error| error.to_string())?;
 
-    fs::write(path, content).map_err(|error| error.to_string())
+    fs::write(path, content).map_err(|error| error.to_string())?;
+    if file_name == "todo.json" { let _ = app.emit("todos-changed", ()); }
+    Ok(())
+}
+
+#[derive(Clone, Deserialize, Serialize)]
+struct AreaPoint { x: f64, y: f64 }
+#[derive(Clone, Deserialize, Serialize)]
+struct AreaSize { width: f64, height: f64 }
+#[derive(Clone, Deserialize, Serialize)]
+struct PetArea { position: AreaPoint, size: AreaSize }
+
+#[tauri::command]
+fn start_pet_area_selection(app: AppHandle, window: tauri::WebviewWindow) -> Result<(), String> {
+    if window.label() != "pet" { return Err("pet window required".into()); }
+    let monitor = window.current_monitor().map_err(|e| e.to_string())?.ok_or("monitor unavailable")?;
+    let area = monitor.work_area();
+    let picker = app.get_webview_window("pet-area").ok_or("area picker unavailable")?;
+    picker.set_position(area.position).map_err(|e| e.to_string())?;
+    picker.set_size(area.size).map_err(|e| e.to_string())?;
+    picker.emit("pet-area-opened", ()).map_err(|e| e.to_string())?;
+    picker.show().map_err(|e| e.to_string())?;
+    if let Err(error) = picker.set_focus() { let _ = picker.hide(); return Err(error.to_string()); }
+    Ok(())
+}
+
+#[tauri::command]
+fn finish_pet_area_selection(app: AppHandle, window: tauri::WebviewWindow, area: PetArea) -> Result<(), String> {
+    if window.label() != "pet-area" { return Err("area picker required".into()); }
+    let values = [area.position.x, area.position.y, area.size.width, area.size.height];
+    let scale = window.scale_factor().map_err(|e| e.to_string())?;
+    let size = window.inner_size().map_err(|e| e.to_string())?;
+    if values.iter().any(|v| !v.is_finite()) || area.position.x < 0.0 || area.position.y < 0.0
+        || area.size.width < 200.0 || area.size.height < 240.0
+        || (area.position.x + area.size.width) * scale > f64::from(size.width) + 1.0
+        || (area.position.y + area.size.height) * scale > f64::from(size.height) + 1.0 {
+        return Err("invalid pet area".into());
+    }
+    let origin = window.inner_position().map_err(|e| e.to_string())?;
+    let physical = PetArea {
+        position: AreaPoint { x: (f64::from(origin.x) + area.position.x * scale).round(), y: (f64::from(origin.y) + area.position.y * scale).round() },
+        size: AreaSize { width: (area.size.width * scale).round(), height: (area.size.height * scale).round() },
+    };
+    app.emit("pet-area-selected", physical).map_err(|e| e.to_string())?;
+    window.hide().map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+fn cancel_pet_area_selection(app: AppHandle, window: tauri::WebviewWindow) -> Result<(), String> {
+    if window.label() != "pet-area" { return Err("area picker required".into()); }
+    window.hide().map_err(|e| e.to_string())?;
+    app.emit("pet-area-closed", ()).map_err(|e| e.to_string())
 }
 
 fn show_main_window(app: &AppHandle) {
@@ -150,7 +203,7 @@ pub fn run() {
                 .with_state_flags(StateFlags::POSITION | StateFlags::SIZE)
                 .build(),
         )
-        .invoke_handler(tauri::generate_handler![read_data_file, write_data_file, get_pet_visibility, set_pet_visibility, toggle_pet_visibility, open_main_window])
+        .invoke_handler(tauri::generate_handler![read_data_file, write_data_file, get_pet_visibility, set_pet_visibility, toggle_pet_visibility, open_main_window, start_pet_area_selection, finish_pet_area_selection, cancel_pet_area_selection])
         .setup(|app| {
             create_tray(app.handle())?;
 
@@ -161,8 +214,17 @@ pub fn run() {
                 api.prevent_close();
                 if window.label() == "pet" {
                     let _ = set_pet_visible(window.app_handle(), false);
+                } else if window.label() == "pet-area" {
+                    let _ = window.hide();
+                    let _ = window.app_handle().emit("pet-area-closed", ());
                 } else {
                     let _ = window.hide();
+                }
+            }
+            if let WindowEvent::Focused(false) = event {
+                if window.label() == "pet-area" {
+                    let _ = window.hide();
+                    let _ = window.app_handle().emit("pet-area-closed", ());
                 }
             }
         })

@@ -53,4 +53,5 @@ export async function writeJsonFile<K extends StorageFileKey>(key: K, data: Stor
   }
 
   localStorage.setItem(fileName, JSON.stringify(data, null, 2));
+  if (key === 'todo') window.dispatchEvent(new Event('memoflow-todos-changed'));
 }

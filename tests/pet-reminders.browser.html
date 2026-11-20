@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="zh-CN">
+<meta charset="utf-8"><title>桌宠提醒集成测试</title>
+<style>
+body { margin:0; color:#29483a; background:#edf4ef; font:14px system-ui; }
+aside { position:fixed; z-index:50; top:12px; left:12px; width:330px; padding:16px; border-radius:14px; background:#ffffffed; box-shadow:0 3px 18px #193b2312; }
+h1 { font-size:18px; margin:0 0 8px; } button { margin:4px; padding:6px 10px; border:1px solid #bdcebf; border-radius:8px; background:white; color:inherit; cursor:pointer; }
+#stage { display:grid; place-items:center; width:100vw; height:100vh; } #history { padding-left:20px; max-height:250px; overflow:auto; line-height:1.7; }
+</style>
+<aside><h1>桌宠提醒集成测试</h1><p>仅在隔离测试端口 1423 使用。新增待办后，等待约 10 秒检查自动提醒；菜单内可以切换风格和频率。</p>
+<button data-count="1">测试：1 项待办</button><button data-count="3">测试：3 项待办</button><button data-count="8">测试：8 项待办</button>
+<button id="complete">测试：全部完成</button><button id="clear">测试：删除全部</button>
+<p id="state">加载中…</p><strong>实际气泡记录</strong><ol id="history"></ol></aside><div id="stage"></div>
+<script type="module">
+import {createApp,h} from 'vue';
+import {createPinia} from 'pinia';
+import PetPage from '/src/pages/Pet/PetPage.vue';
+import {readJsonFile,writeJsonFile} from '/src/utils/storage/jsonStorage.ts';
+const safe=location.hostname==='127.0.0.1'&&location.port==='1423';
+let items=[];
+const state=document.querySelector('#state');
+async function save(){await writeJsonFile('todo',items);state.textContent=`${items.filter(item=>!item.completed).length} 项未完成 / ${items.length} 项；${new Date().toLocaleTimeString()}`;}
+for(const button of document.querySelectorAll('button'))button.disabled=!safe;
+for(const button of document.querySelectorAll('[data-count]'))button.onclick=async()=>{
+ const now=new Date().toISOString();items=Array.from({length:Number(button.dataset.count)},(_,i)=>({id:'integration-'+i,title:'集成测试任务 '+(i+1),completed:false,createdAt:now,updatedAt:now}));await save();
+};
+document.querySelector('#complete').onclick=async()=>{items=items.map(item=>({...item,completed:true}));await save();};
+document.querySelector('#clear').onclick=async()=>{items=[];await save();};
+let previous='';
+new MutationObserver(()=>{
+ const text=document.querySelector('.pet-speech')?.textContent??'';
+ if(text&&text!==previous){const line=document.createElement('li');line.textContent=new Date().toLocaleTimeString()+' '+text;document.querySelector('#history').append(line);}
+ previous=text;
+}).observe(document.querySelector('#stage'),{childList:true,subtree:true,characterData:true});
+createApp({render:()=>h(PetPage)}).use(createPinia()).mount('#stage');
+items=await readJsonFile('todo');state.textContent=safe?`${items.filter(item=>!item.completed).length} 项未完成`:'此页面只允许在隔离测试端口 1423 写入测试任务。';
+</script>
+</html>

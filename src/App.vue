@@ -1,17 +1,20 @@
 <script setup lang="ts">
 import HomePage from '@/pages/Home/HomePage.vue';
 import PetPage from '@/pages/Pet/PetPage.vue';
+import PetAreaPage from '@/pages/Pet/PetAreaPage.vue';
 import { isTauriRuntime } from '@/utils/environment/isTauri';
 import { usePetStore } from '@/store/pet/petStore';
 
 const petWindow = new URLSearchParams(window.location.search).get('view') === 'pet';
+const areaWindow = new URLSearchParams(window.location.search).get('view') === 'pet-area';
 const preview = petWindow && !isTauriRuntime();
 const petStore = usePetStore();
 if (preview) petStore.visible = true;
 </script>
 
 <template>
-  <div v-if="petWindow" :class="{ 'pet-preview-stage': preview }">
+  <PetAreaPage v-if="areaWindow" />
+  <div v-else-if="petWindow" :class="{ 'pet-preview-stage': preview }">
     <PetPage v-if="!preview || petStore.visible" />
     <button v-else class="show-pet-preview" type="button" @click="petStore.setVisible(true)">显示桌宠</button>
   </div>

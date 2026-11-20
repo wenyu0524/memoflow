@@ -24,7 +24,7 @@ jobs:
         run: rustup default stable
       - run: npm ci
       - name: Check desktop pet frames, movement and window configuration
-        run: node --test tests/pet-frames.test.mjs tests/pet-motion.test.mjs tests/desktop-config.test.mjs
+        run: node --test tests/pet-frames.test.mjs tests/pet-motion.test.mjs tests/pet-features.test.mjs tests/desktop-config.test.mjs
       - name: Build executable and installer
         run: npm run tauri:build
       - name: Upload standalone executable
